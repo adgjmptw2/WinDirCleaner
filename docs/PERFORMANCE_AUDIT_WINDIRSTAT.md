@@ -21,6 +21,22 @@ WinDirCleaner의 기본 분석은 일반 파일 열거입니다. WinDirStat처�
 
 WinDirStat은 GPL-2.0입니다. 코드를 가져오거나 포팅하지 않습니다.
 
+## 진단 결과 해석 기준(참고 지표)
+
+아래 수치는 **환경·권한·캐시·부하**에 따라 달라지며, 단정적인 성공/실패 임계값으로 쓰기 어렵습니다. **다음 의사결정에 쓰는 참고 지표**로 보는 것이 맞습니다.
+
+| 지표 | 무엇을 보나 | 참고 관점 |
+|------|-------------|------------|
+| `ParsedRecords` / `TotalRecords`(원시 슬롯) | 고유 FRN으로 정리된 비율 | 비율이 지나치게 낮으면 중복·누락·파싱 경로를 점검할 가치가 있음 |
+| `UnsupportedVersionRecords` | USN_RECORD 버전 2 외 항목 | 0이 아니면 파서·OS 버전 대응을 검토 |
+| `InvalidRecords` | 파싱 실패 건수 | 0이 아니면 레코드 경계·버퍼 처리 등을 검토 |
+| `OrphanRecords` | 부모 FRN을 찾지 못한 항목 | `ParsedRecords` 대비 비율이 크면 트리 재구성 정확도를 추가 검토 |
+| `SuccessRate` | 샘플 크기 조회 성공 비율 | 높을수록 OpenFileById 경로가 유망해 보일 수 있음 |
+| `AccessDeniedRate` | 권한 거부 비율 | 높으면 샘플·추정이 실사용과 어긋날 수 있음 |
+| `FailureRate` | NotFound·기타 실패 합산 비율 | 높으면 핸들/경로·레이스 등 원인 조사 필요 |
+| `FilesPerSecond` | 샘플 처리 처리량 | 샘플 수·stride·캐시에 민감 |
+| UI의 전체 조회 추정 시간 | 직전 트리의 `FileRecords` ÷ `FilesPerSecond` 선형 추정 | **실행하지 않은** 전체 조회에 대한 가늠치일 뿐 |
+
 ## 현재 정리(관찰, experimental)
 
 - 일반 순회·제한 병렬 분석은 **WinDirStat식 NTFS 빠른 분석과 다르다.** 큰 볼륨에서는 여전히 시간이 걸릴 수 있다.

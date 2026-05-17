@@ -18,21 +18,16 @@ namespace WinDirCleaner.App;
 
 public partial class MainWindow : Window
 {
-    private enum DetailedAnalysisKind
-    {
-        Drive,
-        Folder,
-    }
-
     private readonly IDriveInfoService _driveInfoService = new DriveInfoService();
     private readonly IStorageAnalysisService _storageAnalysisService = new StorageAnalysisService();
     private readonly INtfsFastScanProbeService _ntfsFastScanProbeService = new NtfsFastScanProbeService();
     private readonly INtfsFastScanTreeProbeService _ntfsFastScanTreeProbeService = new NtfsFastScanTreeProbeService();
     private readonly INtfsFileSizeProbeService _ntfsFileSizeProbeService = new NtfsFileSizeProbeService();
-    private readonly FolderPickerService _folderPicker = new();
+    private readonly ICleanupCandidateService _cleanupCandidateService = new CleanupCandidatePreviewService();
 
     private readonly ObservableCollection<DriveSummaryViewModel> _drives = new();
     private readonly ObservableCollection<StorageAnalysisItemViewModel> _analysisResults = new();
+    private readonly ObservableCollection<CleanupItemViewModel> _cleanupCandidates = new();
 
     private CancellationTokenSource? _analysisCts;
     private int _analysisOpId;
@@ -42,9 +37,7 @@ public partial class MainWindow : Window
     private int _pendingDriveCapacityTasks;
     private bool _initialLoadCompleted;
 
-    private string? _selectedFolderPath;
-
-    private DetailedAnalysisKind _progressUiAnalysisKind;
+    private bool _syncingDetailSelection;
 
     private long _lastUiFilesScanned;
     private long _lastUiDirectoriesScanned;
@@ -71,12 +64,13 @@ public partial class MainWindow : Window
         InitializeComponent();
         DriveList.ItemsSource = _drives;
         AnalysisResultsGrid.ItemsSource = _analysisResults;
+        CleanupCandidatesGrid.ItemsSource = _cleanupCandidates;
         ConfigureAnalysisColumns();
+        RefillCleanupCandidatesFromService(useDemo: false);
         ParallelDegreeComboBox.Items.Add(2);
         ParallelDegreeComboBox.Items.Add(3);
         ParallelDegreeComboBox.Items.Add(4);
         ParallelDegreeComboBox.SelectedIndex = 0;
-        UpdateSelectedFolderPathDisplay();
         UpdateAnalysisButtonsIdle();
         UpdateNtfsFileSizeBenchmarkHintVisibility();
         UpdateDemoChromeVisuals();
@@ -154,8 +148,8 @@ public partial class MainWindow : Window
         var generation = Interlocked.Increment(ref _driveLoadGeneration);
 
         _analysisResults.Clear();
-        AnalysisResultsGrid.SelectedItem = null;
-        UpdateRightPanelForSelectedItem(null);
+        ClearBothGridSelections();
+        UpdateRightPanelPrimary();
 
         ClearAnalysisPerformanceSection();
 
@@ -197,7 +191,7 @@ public partial class MainWindow : Window
                 _drives.Add(new DriveSummaryViewModel(b));
             }
 
-            FooterPhaseText.Text = "읽기 전용 — 드라이브·폴더 요약";
+            FooterPhaseText.Text = "읽기 전용 — 드라이브 요약";
             FooterDeleteNote.Text = "삭제·정리 실행 기능 없음";
             LastRefreshText.Text = "마지막 드라이브 새로고침: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.CurrentCulture);
 
@@ -225,6 +219,10 @@ public partial class MainWindow : Window
             _initialLoadCompleted = true;
             RefreshDriveLoadingBanner();
             ApplyInteractionChromeState();
+            if (!_demoMode)
+            {
+                RefillCleanupCandidatesFromService(useDemo: false);
+            }
         }
 
         UpdateDriveContextText();
@@ -335,10 +333,6 @@ public partial class MainWindow : Window
         var sel = DriveList.SelectedItem as DriveSummaryViewModel;
         StartAnalysisButton.IsEnabled =
             !demo && !loading && !running && sel is { IsDetailedAnalysisEnabled: true };
-        var folderOk = !string.IsNullOrWhiteSpace(_selectedFolderPath) &&
-                       Directory.Exists(_selectedFolderPath.Trim());
-        PickFolderButton.IsEnabled = !demo && !loading && !running;
-        StartFolderAnalysisButton.IsEnabled = !demo && !loading && !running && folderOk;
         ExperimentalFastDetailCheckBox.IsEnabled = !demo && !loading && !running;
         ParallelDegreeComboBox.IsEnabled =
             !demo && !loading && !running && ExperimentalFastDetailCheckBox.IsChecked == true;
@@ -393,60 +387,6 @@ public partial class MainWindow : Window
             : "순차 모드";
     }
 
-    private void UpdateSelectedFolderPathDisplay()
-    {
-        if (string.IsNullOrWhiteSpace(_selectedFolderPath))
-        {
-            SelectedFolderPathText.Text = "아직 선택된 폴더가 없습니다.";
-        }
-        else
-        {
-            SelectedFolderPathText.Text = _selectedFolderPath;
-        }
-    }
-
-    private void PickFolderButton_OnClick(object sender, RoutedEventArgs e)
-    {
-        if (_demoMode)
-        {
-            return;
-        }
-
-        var picked = _folderPicker.PickFolder(this, _selectedFolderPath);
-        if (picked is null)
-        {
-            return;
-        }
-
-        _selectedFolderPath = picked;
-        UpdateSelectedFolderPathDisplay();
-        ApplyInteractionChromeState();
-    }
-
-    private async void StartFolderAnalysisButton_OnClick(object sender, RoutedEventArgs e)
-    {
-        if (_demoMode)
-        {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(_selectedFolderPath))
-        {
-            AnalysisStateText.Text = "선택된 폴더가 없습니다. 「폴더 선택」으로 경로를 지정하세요.";
-            return;
-        }
-
-        var trimmed = _selectedFolderPath.Trim();
-        if (!Directory.Exists(trimmed))
-        {
-            AnalysisStateText.Text =
-                "선택된 폴더가 없거나 경로가 존재하지 않습니다. 폴더를 다시 선택하세요.";
-            return;
-        }
-
-        await ExecuteDetailedAnalysisAsync(DetailedAnalysisKind.Folder, trimmed);
-    }
-
     private void DriveList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_applyingDemoDriveUi)
@@ -457,8 +397,8 @@ public partial class MainWindow : Window
         InvalidateAnalysisSessionAndCancel();
 
         _analysisResults.Clear();
-        AnalysisResultsGrid.SelectedItem = null;
-        UpdateRightPanelForSelectedItem(null);
+        ClearAnalysisGridSelectionOnly();
+        UpdateRightPanelPrimary();
 
         ClearAnalysisPerformanceSection();
 
@@ -490,10 +430,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        await ExecuteDetailedAnalysisAsync(DetailedAnalysisKind.Drive, driveVm.Name);
+        await ExecuteDetailedAnalysisAsync(driveVm.Name);
     }
 
-    private async Task ExecuteDetailedAnalysisAsync(DetailedAnalysisKind kind, string rootPathForAnalysis)
+    private async Task ExecuteDetailedAnalysisAsync(string rootPathForAnalysis)
     {
         if (_demoMode)
         {
@@ -507,11 +447,9 @@ public partial class MainWindow : Window
         _analysisCts = new CancellationTokenSource();
         var token = _analysisCts.Token;
 
-        _progressUiAnalysisKind = kind;
-
         _analysisResults.Clear();
-        AnalysisResultsGrid.SelectedItem = null;
-        UpdateRightPanelForSelectedItem(null);
+        ClearBothGridSelections();
+        UpdateRightPanelPrimary();
 
         ResetAnalysisUiStatsSnapshot();
         _lastPerformanceSummary = null;
@@ -528,14 +466,9 @@ public partial class MainWindow : Window
                 CultureInfo.CurrentCulture,
                 $"상세 분석 중: 병렬 모드, 동시 작업 {analysisOptions.MaxDegreeOfParallelism}개. ")
             : "상세 분석 중: 순차 모드. ";
-        AnalysisStateText.Text = kind == DetailedAnalysisKind.Folder
-            ? modeLead +
-              $"선택 폴더: {displayPath}. 큰 폴더는 시간이 걸릴 수 있습니다."
-            : modeLead +
-              $"선택한 드라이브: {displayPath}. 큰 드라이브는 몇 분 이상 걸릴 수 있습니다.";
-        FooterAnalysisStateText.Text = kind == DetailedAnalysisKind.Folder
-            ? "상태: 폴더 상세 분석 중"
-            : "상태: 드라이브 상세 분석 중";
+        AnalysisStateText.Text = modeLead +
+            $"선택한 드라이브: {displayPath}. 큰 드라이브는 몇 분 이상 걸릴 수 있습니다.";
+        FooterAnalysisStateText.Text = "상태: 드라이브 상세 분석 중";
 
         var progress = CreateAnalysisProgressHandler(opId);
 
@@ -570,20 +503,10 @@ public partial class MainWindow : Window
                 _lastPerformanceSummary);
             var modePhrase = FormatCompletedAnalysisModePhrase(_lastPerformanceSummary);
 
-            if (kind == DetailedAnalysisKind.Folder)
-            {
-                AnalysisStateText.Text =
-                    "폴더 상세 분석이 완료되었습니다. " + FormatElapsedHuman(_lastUiElapsed) + " · " + modePhrase + " — " + summaryBody
-                    + " 표시된 크기는 집계값입니다.";
-                FooterAnalysisStateText.Text = "상태: 폴더 상세 분석 완료 — " + modePhrase + " — " + summaryBody;
-            }
-            else
-            {
-                AnalysisStateText.Text =
-                    "드라이브 상세 분석이 완료되었습니다. " + FormatElapsedHuman(_lastUiElapsed) + " · " + modePhrase + " — " + summaryBody
-                    + " 표시된 크기는 집계값입니다.";
-                FooterAnalysisStateText.Text = "상태: 드라이브 상세 분석 완료 — " + modePhrase + " — " + summaryBody;
-            }
+            AnalysisStateText.Text =
+                "드라이브 상세 분석이 완료되었습니다. " + FormatElapsedHuman(_lastUiElapsed) + " · " + modePhrase + " — " + summaryBody
+                + " 표시된 크기는 집계값입니다.";
+            FooterAnalysisStateText.Text = "상태: 드라이브 상세 분석 완료 — " + modePhrase + " — " + summaryBody;
 
             LastAnalysisTimeText.Text = "마지막 상세 분석 완료: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.CurrentCulture);
         }
@@ -602,20 +525,10 @@ public partial class MainWindow : Window
                 _lastPerformanceSummary);
             var modePhrase = FormatCompletedAnalysisModePhrase(_lastPerformanceSummary);
 
-            if (kind == DetailedAnalysisKind.Folder)
-            {
-                AnalysisStateText.Text =
-                    "폴더 상세 분석이 취소되었습니다. " + modePhrase + ". 취소 시점까지: " + summaryBody
-                    + "까지 확인했습니다. 현재까지 집계된 결과는 목록에 남아 있을 수 있습니다.";
-                FooterAnalysisStateText.Text = "상태: 폴더 상세 분석 취소됨 — " + modePhrase + " — " + summaryBody;
-            }
-            else
-            {
-                AnalysisStateText.Text =
-                    "드라이브 상세 분석이 취소되었습니다. " + modePhrase + ". 취소 시점까지: " + summaryBody
-                    + "까지 확인했습니다. 현재까지 집계된 결과는 목록에 남아 있을 수 있습니다.";
-                FooterAnalysisStateText.Text = "상태: 드라이브 상세 분석 취소됨 — " + modePhrase + " — " + summaryBody;
-            }
+            AnalysisStateText.Text =
+                "드라이브 상세 분석이 취소되었습니다. " + modePhrase + ". 취소 시점까지: " + summaryBody
+                + "까지 확인했습니다. 현재까지 집계된 결과는 목록에 남아 있을 수 있습니다.";
+            FooterAnalysisStateText.Text = "상태: 드라이브 상세 분석 취소됨 — " + modePhrase + " — " + summaryBody;
         }
         catch (Exception ex)
         {
@@ -627,18 +540,9 @@ public partial class MainWindow : Window
             _analysisResults.Clear();
             ClearAnalysisPerformanceSection();
 
-            if (kind == DetailedAnalysisKind.Folder)
-            {
-                AnalysisStateText.Text =
-                    "폴더 상세 분석 실패: " + FormatElapsedHuman(_lastUiElapsed) + " 후 오류가 발생했습니다. 일부 항목은 확인되지 않았을 수 있습니다.";
-                FooterAnalysisStateText.Text = "상태: 폴더 상세 분석 실패 — " + ex.Message;
-            }
-            else
-            {
-                AnalysisStateText.Text =
-                    "드라이브 상세 분석 실패: " + FormatElapsedHuman(_lastUiElapsed) + " 후 오류가 발생했습니다. 일부 항목은 확인되지 않았을 수 있습니다.";
-                FooterAnalysisStateText.Text = "상태: 드라이브 상세 분석 실패 — " + ex.Message;
-            }
+            AnalysisStateText.Text =
+                "드라이브 상세 분석 실패: " + FormatElapsedHuman(_lastUiElapsed) + " 후 오류가 발생했습니다. 일부 항목은 확인되지 않았을 수 있습니다.";
+            FooterAnalysisStateText.Text = "상태: 드라이브 상세 분석 실패 — " + ex.Message;
         }
         finally
         {
@@ -661,10 +565,7 @@ public partial class MainWindow : Window
             ApplyAnalysisProgress(p);
         });
 
-    private string ActiveAnalysisProgressTitleStem() =>
-        _progressUiAnalysisKind == DetailedAnalysisKind.Folder
-            ? "폴더 상세 분석"
-            : "드라이브 상세 분석";
+    private static string ActiveAnalysisProgressTitleStem() => "드라이브 상세 분석";
 
     private void ApplyAnalysisProgress(StorageAnalysisProgress p)
     {
@@ -745,9 +646,7 @@ public partial class MainWindow : Window
             case StorageAnalysisProgressKind.Cancelled:
                 _lastPerformanceSummary = p.PerformanceSummary;
                 FooterAnalysisStateText.Text =
-                    (_progressUiAnalysisKind == DetailedAnalysisKind.Folder
-                        ? "상태: 폴더 상세 분석 취소됨 — "
-                        : "상태: 드라이브 상세 분석 취소됨 — ")
+                    "상태: 드라이브 상세 분석 취소됨 — "
                     + BuildThroughputSummaryBody(p.Elapsed, p.FilesScanned, p.DirectoriesScanned, p.BytesScanned, p.PerformanceSummary);
                 AnalysisProgressTitleText.Text = ActiveAnalysisProgressTitleStem() + " 취소";
                 ApplyScanningProgressVisuals(p);
@@ -936,18 +835,47 @@ public partial class MainWindow : Window
 
     private void CancelAnalysisButton_OnClick(object sender, RoutedEventArgs e)
     {
-        AnalysisStateText.Text = _progressUiAnalysisKind == DetailedAnalysisKind.Folder
-            ? "폴더 상세 분석 취소를 요청했습니다. 잠시만 기다려 주세요."
-            : "드라이브 상세 분석 취소를 요청했습니다. 잠시만 기다려 주세요.";
-        FooterAnalysisStateText.Text = _progressUiAnalysisKind == DetailedAnalysisKind.Folder
-            ? "상태: 폴더 상세 분석 취소 요청 중…"
-            : "상태: 드라이브 상세 분석 취소 요청 중…";
+        AnalysisStateText.Text = "드라이브 상세 분석 취소를 요청했습니다. 잠시만 기다려 주세요.";
+        FooterAnalysisStateText.Text = "상태: 드라이브 상세 분석 취소 요청 중…";
         _analysisCts?.Cancel();
     }
 
     private void AnalysisResultsGrid_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        UpdateRightPanelForSelectedItem(AnalysisResultsGrid.SelectedItem as StorageAnalysisItemViewModel);
+        if (_syncingDetailSelection)
+        {
+            return;
+        }
+
+        _syncingDetailSelection = true;
+        try
+        {
+            CleanupCandidatesGrid.SelectedItem = null;
+            UpdateRightPanelPrimary();
+        }
+        finally
+        {
+            _syncingDetailSelection = false;
+        }
+    }
+
+    private void CleanupCandidatesGrid_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_syncingDetailSelection)
+        {
+            return;
+        }
+
+        _syncingDetailSelection = true;
+        try
+        {
+            AnalysisResultsGrid.SelectedItem = null;
+            UpdateRightPanelPrimary();
+        }
+        finally
+        {
+            _syncingDetailSelection = false;
+        }
     }
 
     private string GetNtfsFastScanDiagnosticRootPath()
@@ -989,11 +917,185 @@ public partial class MainWindow : Window
         NtfsFileSizeBenchmarkHintText.Visibility = n >= 5000 ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    private void SetNtfsDiagnosticSummary(string text)
+    {
+        if (NtfsDiagnosticSummaryText is not null)
+        {
+            NtfsDiagnosticSummaryText.Text = text;
+        }
+    }
+
+    private static string FormatNtfsStatusLabel(NtfsFastScanStatus status) =>
+        status switch
+        {
+            NtfsFastScanStatus.Completed => "진단 완료",
+            NtfsFastScanStatus.AccessDenied => "권한 문제로 진단을 완료하지 못했습니다.",
+            NtfsFastScanStatus.NotNtfs => "NTFS 아님",
+            NtfsFastScanStatus.Failed => "진단 실패",
+            NtfsFastScanStatus.ApiUnavailable => "API 사용 불가",
+            NtfsFastScanStatus.Supported => "지원됨",
+            NtfsFastScanStatus.NotStarted => "시작 전",
+            _ => status.ToString(),
+        };
+
+    private static string FormatElapsedHumanNtfs(TimeSpan t)
+    {
+        if (t.TotalSeconds < 10)
+        {
+            return t.TotalSeconds.ToString("F2", CultureInfo.CurrentCulture) + "초";
+        }
+
+        if (t.TotalMinutes < 1)
+        {
+            return t.TotalSeconds.ToString("F1", CultureInfo.CurrentCulture) + "초";
+        }
+
+        return string.Create(CultureInfo.CurrentCulture, $"{(int)t.TotalMinutes}분 {t.Seconds}초");
+    }
+
+    private static string InterpretNtfsFastScanProbe(NtfsFastScanProbeResult r) =>
+        r.Status switch
+        {
+            NtfsFastScanStatus.Completed when r.RecordsRead > 0 =>
+                "해석: 레코드 열거가 성공한 것으로 보입니다. 다음 진단에서 트리 골격을 확인할 수 있습니다.",
+            NtfsFastScanStatus.Completed =>
+                "해석: 읽은 레코드 수가 0입니다. 볼륨 상태를 한 번 더 확인해 보세요.",
+            NtfsFastScanStatus.AccessDenied =>
+                "해석: 권한 문제로 볼륨 진단을 열 수 없습니다.",
+            NtfsFastScanStatus.NotNtfs =>
+                "해석: NTFS 볼륨이 아니어서 이 진단을 사용할 수 없습니다.",
+            NtfsFastScanStatus.Failed =>
+                "해석: 진단을 완료하지 못했습니다. 일반 상세 분석은 계속 사용할 수 있습니다.",
+            _ =>
+                "해석: 상태를 확인한 뒤 필요하면 다시 실행해 보세요.",
+        };
+
+    private static string BuildRecordsReadSummary(NtfsFastScanProbeResult r)
+    {
+        var line1 = string.Create(
+            CultureInfo.CurrentCulture,
+            $"레코드 열거 진단 · {FormatNtfsStatusLabel(r.Status)} · {FormatElapsedHumanNtfs(r.Elapsed)}");
+        var line2 = InterpretNtfsFastScanProbe(r).Replace("해석: ", string.Empty, StringComparison.Ordinal);
+        return line1 + Environment.NewLine + line2;
+    }
+
+    private static string InterpretNtfsTreeNonCompleted(NtfsFastScanStatus status) =>
+        status switch
+        {
+            NtfsFastScanStatus.AccessDenied =>
+                "해석: 권한 문제로 트리 진단을 마치지 못했을 수 있습니다. 일반 상세 분석은 그대로 쓸 수 있습니다.",
+            NtfsFastScanStatus.NotNtfs =>
+                "해석: NTFS가 아니어서 트리 진단을 쓸 수 없습니다.",
+            NtfsFastScanStatus.Failed =>
+                "해석: 트리 진단을 끝까지 수행하지 못했습니다.",
+            _ =>
+                "해석: 결과 상태를 확인한 뒤 필요하면 다시 실행해 보세요.",
+        };
+
+    private static string InterpretNtfsTree(NtfsFastScanTreeProbeResult r)
+    {
+        if (r.Status != NtfsFastScanStatus.Completed)
+        {
+            return InterpretNtfsTreeNonCompleted(r.Status);
+        }
+
+        var s = r.Summary;
+        var parts = new List<string>();
+        if (s.UnsupportedVersionRecords == 0 && s.InvalidRecords == 0)
+        {
+            parts.Add("USN_RECORD 파싱 상태는 양호해 보입니다.");
+        }
+
+        if (s.UnsupportedVersionRecords > 0)
+        {
+            parts.Add("지원하지 않는 USN_RECORD 버전이 있습니다.");
+        }
+
+        if (s.InvalidRecords > 0)
+        {
+            parts.Add("일부 레코드 파싱에 실패했습니다.");
+        }
+
+        var orphanRatio = s.ParsedRecords > 0 ? (double)s.OrphanRecords / s.ParsedRecords : 0.0;
+        if (orphanRatio > 0.05)
+        {
+            parts.Add("부모를 찾지 못한 레코드 비중이 큽니다. 트리 재구성은 추가 검토가 필요할 수 있습니다.");
+        }
+        else if (s.ParsedRecords > 0 && s.OrphanRecords <= Math.Max(50L, (long)(s.ParsedRecords * 0.001)))
+        {
+            parts.Add("대부분 레코드가 부모와 연결된 것으로 보입니다.");
+        }
+
+        if (parts.Count == 0)
+        {
+            parts.Add("요약을 만들기에 정보가 부족합니다.");
+        }
+
+        return "해석: " + string.Join(" ", parts);
+    }
+
+    private static string BuildTreeSummary(NtfsFastScanTreeProbeResult r)
+    {
+        var line1 = string.Create(
+            CultureInfo.CurrentCulture,
+            $"트리 골격 진단 · {FormatNtfsStatusLabel(r.Status)} · {FormatElapsedHumanNtfs(r.Summary.Elapsed)}");
+        var line2 = InterpretNtfsTree(r).Replace("해석: ", string.Empty, StringComparison.Ordinal);
+        return line1 + Environment.NewLine + line2;
+    }
+
+    private static string InterpretNtfsFileSize(NtfsFileSizeProbeResult r)
+    {
+        if (r.Status != NtfsFastScanStatus.Completed)
+        {
+            return r.Status switch
+            {
+                NtfsFastScanStatus.AccessDenied =>
+                    "해석: 권한 문제로 샘플 진단을 마치지 못했을 수 있습니다. 일반 상세 분석은 그대로 쓸 수 있습니다.",
+                NtfsFastScanStatus.NotNtfs =>
+                    "해석: NTFS가 아니어서 샘플 진단을 쓸 수 없습니다.",
+                NtfsFastScanStatus.Failed =>
+                    "해석: 샘플 진단을 끝까지 수행하지 못했습니다.",
+                _ =>
+                    "해석: 결과 상태를 확인한 뒤 필요하면 다시 실행해 보세요.",
+            };
+        }
+
+        var s = r.Summary;
+        var parts = new List<string>();
+        if (s.SuccessRate >= 0.98)
+        {
+            parts.Add("샘플 기준으로 크기 조회 성공률이 높은 편입니다.");
+        }
+
+        if (s.AccessDeniedRate > 0.05)
+        {
+            parts.Add("권한 때문에 크기를 읽지 못한 파일이 있습니다.");
+        }
+
+        if (s.FailureRate > 0.05)
+        {
+            parts.Add("일부 파일 크기 조회가 실패했습니다.");
+        }
+
+        parts.Add("아래 전체 시간은 샘플 속도로 곱해 본 추정치이며, 실제 전체 조회는 아직 실행하지 않았습니다.");
+        return "해석: " + string.Join(" ", parts);
+    }
+
+    private static string BuildFileSizeSummary(NtfsFileSizeProbeResult r)
+    {
+        var s = r.Summary;
+        var line1 = string.Create(
+            CultureInfo.CurrentCulture,
+            $"파일 크기 샘플 진단 · {FormatNtfsStatusLabel(r.Status)} · {FormatElapsedHumanNtfs(s.Elapsed)} · {s.SuccessCount:N0}/{s.AttemptedCount:N0} 성공");
+        var line2 = InterpretNtfsFileSize(r).Replace("해석: ", string.Empty, StringComparison.Ordinal);
+        return line1 + Environment.NewLine + line2;
+    }
+
     private static string FormatNtfsFastScanDiagnosticResult(NtfsFastScanProbeResult r)
     {
         var lines = new List<string>
         {
-            "상태: " + r.Status,
+            "상태: " + FormatNtfsStatusLabel(r.Status),
             "루트: " + r.RootPath,
             "볼륨 장치: " + r.VolumePath,
             "NTFS로 식별: " + (r.IsNtfs ? "예" : "아니오"),
@@ -1011,6 +1113,7 @@ public partial class MainWindow : Window
             lines.Add("상세: " + r.DetailMessage);
         }
 
+        lines.Add(InterpretNtfsFastScanProbe(r));
         return string.Join(Environment.NewLine, lines);
     }
 
@@ -1019,7 +1122,7 @@ public partial class MainWindow : Window
         var s = r.Summary;
         var lines = new List<string>
         {
-            "상태: " + r.Status,
+            "상태: " + FormatNtfsStatusLabel(r.Status),
             "루트: " + r.RootPath,
             "볼륨 장치: " + r.VolumePath,
             "NTFS로 식별: " + (r.IsNtfs ? "예" : "아니오"),
@@ -1030,11 +1133,11 @@ public partial class MainWindow : Window
             "AccessDenied: " + s.AccessDeniedCount.ToString("N0", CultureInfo.CurrentCulture),
             "NotFound: " + s.NotFoundCount.ToString("N0", CultureInfo.CurrentCulture),
             "기타 실패: " + s.FailedCount.ToString("N0", CultureInfo.CurrentCulture),
-            "성공률: " + FormatPercent(s.SuccessRate),
-            "AccessDenied 비율: " + FormatPercent(s.AccessDeniedRate),
-            "실패률(NotFound+기타): " + FormatPercent(s.FailureRate),
+            "성공률: " + FormatPercentOneLine(s.SuccessRate),
+            "권한 거부: " + FormatPercentOneLine(s.AccessDeniedRate),
+            "실패률: " + FormatPercentOneLine(s.FailureRate),
             "샘플 합계 크기: " + ByteSizeFormatter.Format(s.TotalSampledSizeBytes),
-            "처리 속도: " + s.FilesPerSecond.ToString("F2", CultureInfo.CurrentCulture) + " files/s",
+            "샘플 처리 속도: " + s.FilesPerSecond.ToString("F0", CultureInfo.CurrentCulture) + " files/s",
         };
 
         if (_lastNtfsTreeFileRecords is { } treeFileCount &&
@@ -1044,23 +1147,25 @@ public partial class MainWindow : Window
             var estSeconds = treeFileCount / s.FilesPerSecond;
             var est = TimeSpan.FromSeconds(estSeconds);
             lines.Add(string.Empty);
+            lines.Add("[전체 조회 추정 · 샘플 기반]");
             lines.Add(
-                "직전 트리 진단 FileRecords " +
+                "기준 파일 수: " +
                 treeFileCount.ToString("N0", CultureInfo.CurrentCulture) +
-                "개를 모두 이 속도로 조회한다고 가정하면 약 " +
-                FormatApproxDuration(est) +
-                "가 걸릴 수 있습니다(추정치, 실제 전체 집계 아님).");
+                " (직전 트리 골격 진단의 FileRecords) · 샘플 처리 속도: " +
+                s.FilesPerSecond.ToString("F0", CultureInfo.CurrentCulture) +
+                " files/s · 전체 조회 추정(선형): 약 " +
+                FormatApproxDuration(est));
+            lines.Add("이 값은 샘플 기반 추정이며, 실제 전체 파일 크기 조회는 아직 실행하지 않았습니다.");
         }
         else
         {
             lines.Add(string.Empty);
-            lines.Add("전체 예상 시간: 「트리 골격 진단」을 완료한 뒤에만 FileRecords 기준 추정을 표시합니다.");
+            lines.Add("[전체 조회 추정]");
+            lines.Add("「트리 골격 진단」을 완료하면 FileRecords 수와 샘플 속도로 추정 시간을 적습니다.");
         }
 
         lines.Add(string.Empty);
-        lines.Add("USN 열거 순서에 따른 편향이 남을 수 있습니다. 5,000건 이상은 stride로 구간을 넓힙니다.");
-        lines.Add("전체 용량 계산은 아직 수행하지 않습니다. OpenFileById 샘플 진단만 수행했습니다.");
-        lines.Add("진단 중에는 이 패널 버튼이 비활성화됩니다. 장시간 샘플은 완료까지 기다려 주세요.");
+        lines.Add("USN 순서 편향이 남을 수 있고, 5,000건 이상은 stride로 구간을 넓힙니다.");
 
         if (!string.IsNullOrEmpty(r.ErrorMessage))
         {
@@ -1086,11 +1191,13 @@ public partial class MainWindow : Window
             }
         }
 
+        lines.Add(string.Empty);
+        lines.Add(InterpretNtfsFileSize(r));
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static string FormatPercent(double rate) =>
-        (rate * 100).ToString("F2", CultureInfo.CurrentCulture) + "%";
+    private static string FormatPercentOneLine(double rate) =>
+        (rate * 100).ToString("F1", CultureInfo.CurrentCulture) + "%";
 
     private static string FormatApproxDuration(TimeSpan t)
     {
@@ -1112,7 +1219,7 @@ public partial class MainWindow : Window
         var s = r.Summary;
         var lines = new List<string>
         {
-            "상태: " + r.Status,
+            "상태: " + FormatNtfsStatusLabel(r.Status),
             "루트: " + r.RootPath,
             "볼륨 장치: " + r.VolumePath,
             "NTFS로 식별: " + (r.IsNtfs ? "예" : "아니오"),
@@ -1158,6 +1265,8 @@ public partial class MainWindow : Window
             }
         }
 
+        lines.Add(string.Empty);
+        lines.Add(InterpretNtfsTree(r));
         return string.Join(Environment.NewLine, lines);
     }
 
@@ -1170,7 +1279,7 @@ public partial class MainWindow : Window
 
         BeginNtfsUiOperation();
         var root = GetNtfsFastScanDiagnosticRootPath();
-        NtfsFastScanTreeDiagResultText.Text = "트리 골격 진단 중…";
+        NtfsFastScanTreeDiagResultText.Text = "NTFS 트리 골격 진단 중…";
         NtfsFastScanTreeDiagButton.IsEnabled = false;
         try
         {
@@ -1181,10 +1290,12 @@ public partial class MainWindow : Window
             }
 
             NtfsFastScanTreeDiagResultText.Text = FormatNtfsFastScanTreeDiagnosticResult(result);
+            SetNtfsDiagnosticSummary(BuildTreeSummary(result));
         }
         catch (Exception ex)
         {
-            NtfsFastScanTreeDiagResultText.Text = "트리 골격 진단 실패: " + ex.Message;
+            NtfsFastScanTreeDiagResultText.Text = "진단 실패: " + ex.Message;
+            SetNtfsDiagnosticSummary("트리 골격 진단 · 진단 실패" + Environment.NewLine + ex.Message);
         }
         finally
         {
@@ -1201,16 +1312,18 @@ public partial class MainWindow : Window
 
         BeginNtfsUiOperation();
         var root = GetNtfsFastScanDiagnosticRootPath();
-        NtfsFastScanDiagResultText.Text = "NTFS 진단 실행 중…";
+        NtfsFastScanDiagResultText.Text = "NTFS 레코드 열거 중…";
         NtfsFastScanDiagButton.IsEnabled = false;
         try
         {
             var result = await _ntfsFastScanProbeService.ProbeAsync(root).ConfigureAwait(true);
             NtfsFastScanDiagResultText.Text = FormatNtfsFastScanDiagnosticResult(result);
+            SetNtfsDiagnosticSummary(BuildRecordsReadSummary(result));
         }
         catch (Exception ex)
         {
-            NtfsFastScanDiagResultText.Text = "NTFS 진단 실패: " + ex.Message;
+            NtfsFastScanDiagResultText.Text = "진단 실패: " + ex.Message;
+            SetNtfsDiagnosticSummary("레코드 열거 진단 · 진단 실패" + Environment.NewLine + ex.Message);
         }
         finally
         {
@@ -1235,10 +1348,12 @@ public partial class MainWindow : Window
         {
             var result = await _ntfsFileSizeProbeService.ProbeFileSizesAsync(root, n).ConfigureAwait(true);
             NtfsFileSizeProbeResultText.Text = FormatNtfsFileSizeProbeResult(result);
+            SetNtfsDiagnosticSummary(BuildFileSizeSummary(result));
         }
         catch (Exception ex)
         {
             NtfsFileSizeProbeResultText.Text = "진단 실패: " + ex.Message;
+            SetNtfsDiagnosticSummary("파일 크기 샘플 진단 · 진단 실패" + Environment.NewLine + ex.Message);
         }
         finally
         {
@@ -1246,22 +1361,14 @@ public partial class MainWindow : Window
         }
     }
 
-    private static void ResetNtfsDiagnosticPlaceholderTexts(
-        TextBlock ntfsFastScanDiagResultText,
-        TextBlock ntfsFastScanTreeDiagResultText,
-        TextBlock ntfsFileSizeProbeResultText)
+    private void ResetNtfsDiagnosticPlaceholderTexts()
     {
         const string idle = "아직 실행하지 않았습니다.";
-        ntfsFastScanDiagResultText.Text = idle;
-        ntfsFastScanTreeDiagResultText.Text = idle;
-        ntfsFileSizeProbeResultText.Text = idle;
+        NtfsFastScanDiagResultText.Text = idle;
+        NtfsFastScanTreeDiagResultText.Text = idle;
+        NtfsFileSizeProbeResultText.Text = idle;
+        SetNtfsDiagnosticSummary("아직 실험 진단을 실행하지 않았습니다.");
     }
-
-    private void ResetNtfsDiagnosticPlaceholderTexts() =>
-        ResetNtfsDiagnosticPlaceholderTexts(
-            NtfsFastScanDiagResultText,
-            NtfsFastScanTreeDiagResultText,
-            NtfsFileSizeProbeResultText);
 
     private void BeginNtfsUiOperation()
     {
@@ -1314,7 +1421,9 @@ public partial class MainWindow : Window
             _analysisResults.Clear();
             RefillDemoAnalysisResults();
             AnalysisResultsGrid.SelectedItem = null;
-            UpdateRightPanelForSelectedItem(null);
+            RefillCleanupCandidatesFromService(useDemo: true);
+            CleanupCandidatesGrid.SelectedItem = null;
+            UpdateRightPanelPrimary();
 
             ClearAnalysisPerformanceSection();
 
@@ -1322,6 +1431,7 @@ public partial class MainWindow : Window
             NtfsFastScanTreeDiagResultText.Text = DemoNtfsResultLead + DemoDataService.GetDemoNtfsTreeText();
             NtfsFileSizeProbeResultText.Text = DemoNtfsResultLead + DemoDataService.GetDemoNtfsFileSizeText();
             _lastNtfsTreeFileRecords = DemoDataService.GetDemoTreeFileRecordsForEstimate();
+            SetNtfsDiagnosticSummary("데모 · 샘플만 표시 · 실제 진단 미실행");
 
             LoadErrorText.Visibility = Visibility.Collapsed;
             LastRefreshText.Text = "데모 — 실제 드라이브 목록 없음(샘플만)";
@@ -1460,12 +1570,12 @@ public partial class MainWindow : Window
             else
             {
                 AnalysisStateText.Text =
-                    $"드라이브 {vm.Name}이(가) 선택되었습니다. 드라이브 전체 대신 폴더를 직접 골라도 됩니다.";
+                    $"드라이브 {vm.Name}이(가) 선택되었습니다. 「드라이브 상세 분석」으로 최상위 항목을 집계할 수 있습니다.";
             }
         }
         else
         {
-            AnalysisStateText.Text = "고정·이동식 드라이브를 고르거나, 위 「폴더 상세 분석」으로 경로를 지정하세요.";
+            AnalysisStateText.Text = "고정·이동식 드라이브를 고른 뒤 「드라이브 상세 분석」을 시작하세요.";
         }
     }
 
@@ -1503,16 +1613,151 @@ public partial class MainWindow : Window
         }
     }
 
-    private void UpdateRightPanelForSelectedItem(StorageAnalysisItemViewModel? vm)
+    private void ClearBothGridSelections()
     {
-        if (vm == null)
+        if (_syncingDetailSelection)
         {
-            AnalysisEntryDetailPanel.Visibility = Visibility.Collapsed;
-            PolicyHeadingText.Visibility = Visibility.Visible;
-            PolicyScrollViewer.Visibility = Visibility.Visible;
             return;
         }
 
+        _syncingDetailSelection = true;
+        try
+        {
+            AnalysisResultsGrid.SelectedItem = null;
+            CleanupCandidatesGrid.SelectedItem = null;
+        }
+        finally
+        {
+            _syncingDetailSelection = false;
+        }
+    }
+
+    private void ClearAnalysisGridSelectionOnly()
+    {
+        if (_syncingDetailSelection)
+        {
+            return;
+        }
+
+        _syncingDetailSelection = true;
+        try
+        {
+            AnalysisResultsGrid.SelectedItem = null;
+        }
+        finally
+        {
+            _syncingDetailSelection = false;
+        }
+    }
+
+    private void RefillCleanupCandidatesFromService(bool useDemo)
+    {
+        foreach (var vm in _cleanupCandidates)
+        {
+            vm.SelectionChanged -= CleanupItemViewModel_OnSelectionChanged;
+        }
+
+        _cleanupCandidates.Clear();
+
+        var items = useDemo ? DemoDataService.GetDemoCleanupPreviewItems() : _cleanupCandidateService.GetPreviewCandidates();
+        foreach (var item in items)
+        {
+            var vm = new CleanupItemViewModel(item);
+            vm.SelectionChanged += CleanupItemViewModel_OnSelectionChanged;
+            _cleanupCandidates.Add(vm);
+        }
+
+        RefreshCleanupSelectionSummary();
+    }
+
+    private void CleanupItemViewModel_OnSelectionChanged(object? sender, EventArgs e) => RefreshCleanupSelectionSummary();
+
+    private void RefreshCleanupSelectionSummary()
+    {
+        var selected = _cleanupCandidates.Where(x => x.IsSelected).ToList();
+        var count = selected.Count;
+        long sum = 0;
+        var counted = 0;
+        foreach (var x in selected)
+        {
+            if (x.Item.SizeBytes > 0)
+            {
+                sum += x.Item.SizeBytes;
+                counted++;
+            }
+        }
+
+        if (count == 0)
+        {
+            CleanupSelectionSummaryText.Text = "선택 0개 · 합계 크기: —";
+            return;
+        }
+
+        if (counted == 0)
+        {
+            CleanupSelectionSummaryText.Text =
+                string.Create(CultureInfo.CurrentCulture, $"선택 {count:N0}개 · 합계 크기: 미계산 항목만 포함(미리보기)");
+            return;
+        }
+
+        if (counted < count)
+        {
+            CleanupSelectionSummaryText.Text =
+                string.Create(
+                    CultureInfo.CurrentCulture,
+                    $"선택 {count:N0}개 · 합계(크기가 있는 항목만): {ByteSizeFormatter.Format(sum)} · 나머지는 미계산(미리보기)");
+            return;
+        }
+
+        CleanupSelectionSummaryText.Text =
+            string.Create(CultureInfo.CurrentCulture, $"선택 {count:N0}개 · 합계 크기: {ByteSizeFormatter.Format(sum)} (미리보기)");
+    }
+
+    private void UpdateRightPanelPrimary()
+    {
+        if (CleanupCandidatesGrid.SelectedItem is CleanupItemViewModel c)
+        {
+            ShowCleanupDetail(c);
+            return;
+        }
+
+        if (AnalysisResultsGrid.SelectedItem is StorageAnalysisItemViewModel a)
+        {
+            ShowAnalysisDetail(a);
+            return;
+        }
+
+        ShowPolicyOnly();
+    }
+
+    private void ShowPolicyOnly()
+    {
+        CleanupCandidateDetailPanel.Visibility = Visibility.Collapsed;
+        AnalysisEntryDetailPanel.Visibility = Visibility.Collapsed;
+        PolicyHeadingText.Visibility = Visibility.Visible;
+        PolicyScrollViewer.Visibility = Visibility.Visible;
+    }
+
+    private void ShowCleanupDetail(CleanupItemViewModel c)
+    {
+        CleanupCandidateDetailPanel.Visibility = Visibility.Visible;
+        AnalysisEntryDetailPanel.Visibility = Visibility.Collapsed;
+        PolicyHeadingText.Visibility = Visibility.Collapsed;
+        PolicyScrollViewer.Visibility = Visibility.Collapsed;
+
+        CleanupDetailNameText.Text = c.Name;
+        CleanupDetailRiskText.Text = "분류: " + c.RiskBadgeText + " · " + c.ProtectionLabel;
+        CleanupDetailPathText.Text = "경로: " + c.Path;
+        CleanupDetailDescriptionText.Text = "설명: " + c.Description;
+        CleanupDetailReasonText.Text = "분류 이유: " + c.Reason;
+        CleanupDetailImpactText.Text = "삭제 시 영향(참고): " + c.Impact;
+        CleanupDetailStatusText.Text = "현재 상태: 미리보기 / 삭제 기능 없음";
+        CleanupDetailDangerNoteText.Visibility = c.IsDangerous ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void ShowAnalysisDetail(StorageAnalysisItemViewModel vm)
+    {
+        CleanupCandidateDetailPanel.Visibility = Visibility.Collapsed;
         AnalysisEntryDetailPanel.Visibility = Visibility.Visible;
         PolicyHeadingText.Visibility = Visibility.Collapsed;
         PolicyScrollViewer.Visibility = Visibility.Collapsed;

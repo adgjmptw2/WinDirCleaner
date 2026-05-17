@@ -5,15 +5,17 @@ This file describes direction and scope. It is not a release promise.
 ## Current focus
 
 - Read-only storage overview
-- Stable analysis UX
+- **Cleanup candidate preview** (risk labels + protected dangerous rows; no deletion)
+- Stable analysis UX (drive top-level enumeration only)
 - **Demo mode** for safe screenshots (no disk access, static sample data)
 - NTFS diagnostics as **experimental** tools (not a replacement for normal enumeration)
 
 ## Near-term
 
-- 공개용 스크린샷 정리 및 데모 모드 안내 보강
-- 실험 NTFS 진단과 일반 상세 분석 기능 구분 유지
-- Polish UI layout
+- Candidate detection rules (read-only heuristics; still no destructive actions)
+- Dry-run design (separate UX and safety review)
+- Deletion safety review (if ever considered)
+- Polish UI layout for preview vs analysis vs NTFS sections
 - Improve NTFS diagnostic reporting (clarity, errors, progress wording)
 - Compare fast-scan diagnostics against normal scan results where useful
 - Add curated screenshots under `docs/screenshots/` (prefer demo mode captures)
@@ -27,7 +29,7 @@ This file describes direction and scope. It is not a release promise.
 
 ## Not planned for now
 
-- Automatic deletion or “cleanup run” automation
+- Automatic cleanup or “cleanup run” automation
 - Registry cleaning
 - Memory cleaning
 - DriverStore cleanup

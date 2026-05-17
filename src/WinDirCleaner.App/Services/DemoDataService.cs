@@ -1,4 +1,6 @@
+using System.Linq;
 using WinDirCleaner.Core.Models;
+using WinDirCleaner.Core.Services;
 
 namespace WinDirCleaner.App.Services;
 
@@ -62,7 +64,7 @@ internal static class DemoDataService
     internal static string GetDemoNtfsEnumUsnText() =>
         string.Join(
             Environment.NewLine,
-            "상태: Completed",
+            "상태: 진단 완료",
             @"루트: C:\",
             @"볼륨 장치: \\.\C:",
             "NTFS로 식별: 예",
@@ -70,12 +72,14 @@ internal static class DemoDataService
             "파싱 성공(고유 레코드): " + (1_199_800L).ToString("N0"),
             "소요: 4.800초",
             string.Empty,
+            "해석: 레코드 열거가 성공한 것으로 보입니다. 다음 진단에서 트리 골격을 확인할 수 있습니다.",
+            string.Empty,
             "※ 데모용 고정 문자열입니다. 실제 IOCTL을 실행하지 않았습니다.");
 
     internal static string GetDemoNtfsTreeText() =>
         string.Join(
             Environment.NewLine,
-            "상태: Completed",
+            "상태: 진단 완료",
             @"루트: C:\",
             @"볼륨 장치: \\.\C:",
             "NTFS로 식별: 예",
@@ -93,12 +97,14 @@ internal static class DemoDataService
             string.Empty,
             "파일 크기/폴더 용량은 아직 계산하지 않습니다.",
             string.Empty,
+            "해석: USN_RECORD 파싱 상태는 양호해 보입니다. 대부분 레코드가 부모와 연결된 것으로 보입니다.",
+            string.Empty,
             "※ 데모용 고정 문자열입니다. 실제 트리 진단을 실행하지 않았습니다.");
 
     internal static string GetDemoNtfsFileSizeText() =>
         string.Join(
             Environment.NewLine,
-            "상태: Completed",
+            "상태: 진단 완료",
             @"루트: C:\",
             @"볼륨 장치: \\.\C:",
             "NTFS로 식별: 예",
@@ -109,16 +115,19 @@ internal static class DemoDataService
             "AccessDenied: 0",
             "NotFound: 1",
             "기타 실패: 2",
-            "성공률: 99.70%",
-            "AccessDenied 비율: 0.00%",
-            "실패률(NotFound+기타): 0.30%",
+            "성공률: 99.7%",
+            "권한 거부: 0.0%",
+            "실패률: 0.3%",
             "샘플 합계 크기: 2.4 GB",
-            "처리 속도: 8333.33 files/s",
+            "샘플 처리 속도: 8333 files/s",
             string.Empty,
-            "직전 트리 진단 FileRecords 820,000개를 모두 이 속도로 조회한다고 가정하면 약 1분 39초가 걸릴 수 있습니다(추정치, 실제 전체 집계 아님).",
+            "[전체 조회 추정 · 샘플 기반]",
+            "기준 파일 수: 820,000 (직전 트리 골격 진단의 FileRecords) · 샘플 처리 속도: 8333 files/s · 전체 조회 추정(선형): 약 1분 39초",
+            "이 값은 샘플 기반 추정이며, 실제 전체 파일 크기 조회는 아직 실행하지 않았습니다.",
             string.Empty,
-            "USN 열거 순서에 따른 편향이 남을 수 있습니다. 5,000건 이상은 stride로 구간을 넓힙니다.",
-            "전체 용량 계산은 아직 수행하지 않습니다. OpenFileById 샘플 진단만 수행했습니다.",
+            "USN 순서 편향이 남을 수 있고, 5,000건 이상은 stride로 구간을 넓힙니다.",
+            string.Empty,
+            "해석: 샘플 기준으로 크기 조회 성공률이 높은 편입니다. 아래 전체 시간은 샘플 속도로 곱해 본 추정치이며, 실제 전체 조회는 아직 실행하지 않았습니다.",
             string.Empty,
             "샘플(일부):",
             "  • demo-note.txt | 4 KB",
@@ -127,6 +136,24 @@ internal static class DemoDataService
             "※ 데모용 고정 문자열입니다. 실제 OpenFileById 진단을 실행하지 않았습니다.");
 
     internal static long GetDemoTreeFileRecordsForEstimate() => 820_000L;
+
+    internal static IReadOnlyList<CleanupItem> GetDemoCleanupPreviewItems()
+    {
+        var preview = new CleanupCandidatePreviewService().GetPreviewCandidates();
+        return preview
+            .Select(
+                x => new CleanupItem(
+                    id: "demo-" + x.Id,
+                    name: "[데모] " + x.Name,
+                    path: x.Path,
+                    sizeBytes: x.SizeBytes == 0 ? 0 : Math.Max(x.SizeBytes / 4, 4096L),
+                    risk: x.Risk,
+                    selected: false,
+                    description: x.Description + " (데모 표시)",
+                    reason: x.Reason,
+                    impact: x.Impact))
+            .ToList();
+    }
 
     private static StorageAnalysisItem NewDemoDir(
         string name,

@@ -138,7 +138,7 @@
             <StackPanel>
                 <TextBlock x:Name="FooterPhaseText"
                            FontWeight="SemiBold"
-                           Text="읽기 전용 — 드라이브·폴더 요약" />
+                           Text="읽기 전용 — 드라이브 요약" />
                 <TextBlock x:Name="FooterDeleteNote" Margin="0,2,0,0" Foreground="#444444" Text="삭제·정리 실행 기능 없음" />
                 <TextBlock x:Name="FooterAnalysisStateText" Margin="0,4,0,0" Foreground="#333333" Text="상태: 준비 중" />
                 <TextBlock x:Name="LastRefreshText" Margin="0,2,0,0" Foreground="#333333" Text="마지막 드라이브 새로고침: —" />
@@ -250,7 +250,7 @@
                     <TextBlock Grid.Row="0" Style="{StaticResource SectionTitle}" Text="상세 분석 (일반)" />
                     <TextBlock Grid.Row="1"
                                Style="{StaticResource SectionHint}"
-                               Text="드라이브 루트 또는 선택 폴더의 바로 아래 항목만 표시합니다." />
+                               Text="선택한 드라이브 루트의 바로 아래 항목만 표시합니다." />
 
                     <Border Grid.Row="2" Style="{StaticResource PanelCardNeutral}">
                         <StackPanel>
@@ -259,62 +259,21 @@
                                 <Run FontWeight="SemiBold" Text="빠른 개요" />
                                 <Run Text=" — 이름·유형·용량만 확인합니다." />
                             </TextBlock>
-                            <TextBlock TextWrapping="Wrap" Foreground="#333333" Margin="0,0,0,6">
+                            <TextBlock TextWrapping="Wrap" Foreground="#333333">
                                 <Run FontWeight="SemiBold" Text="드라이브 상세 분석" />
                                 <Run Text=" — 선택한 드라이브 루트의 바로 아래 항목을 집계합니다." />
                             </TextBlock>
-                            <TextBlock TextWrapping="Wrap" Foreground="#333333">
-                                <Run FontWeight="SemiBold" Text="폴더 상세 분석" />
-                                <Run Text=" — 지정한 폴더의 바로 아래 항목을 집계합니다." />
-                            </TextBlock>
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Row="3" Style="{StaticResource PanelCardInfo}">
-                        <StackPanel>
-                            <TextBlock FontWeight="SemiBold" Text="폴더 지정" />
-                            <TextBlock Margin="0,6,0,8"
-                                       TextWrapping="Wrap"
-                                       Foreground="#555555"
-                                       FontSize="12"
-                                       Text="필요한 위치만 골라 볼 수 있습니다." />
-                            <StackPanel Margin="0,0,0,0" Orientation="Horizontal">
-                                <Button x:Name="PickFolderButton"
-                                        Content="폴더 선택"
-                                        Padding="10,6"
-                                        Margin="0,0,8,0"
-                                        Click="PickFolderButton_OnClick" />
-                                <Button x:Name="StartFolderAnalysisButton"
-                                        Content="폴더 상세 분석"
-                                        Padding="10,6"
-                                        IsEnabled="False"
-                                        Click="StartFolderAnalysisButton_OnClick" />
-                            </StackPanel>
-                            <TextBlock Margin="0,8,0,0"
-                                       FontWeight="SemiBold"
-                                       Foreground="#333333"
-                                       Text="선택된 경로" />
-                            <TextBlock x:Name="SelectedFolderPathText"
-                                       Margin="0,4,0,0"
-                                       TextWrapping="Wrap"
-                                       Foreground="#222222"
-                                       Text="아직 선택된 폴더가 없습니다." />
-                            <TextBlock Margin="0,8,0,0"
-                                       TextWrapping="Wrap"
-                                       FontSize="11"
-                                       Foreground="#666666"
-                                       Text="큰 폴더는 시간이 걸릴 수 있습니다." />
-                        </StackPanel>
-                    </Border>
-
-                    <StackPanel Grid.Row="4" Margin="0,0,0,6">
+                    <StackPanel Grid.Row="3" Margin="0,0,0,6">
                         <TextBlock x:Name="DemoModeAnalysisNoticeText"
                                    Margin="0,0,0,8"
                                    TextWrapping="Wrap"
                                    Foreground="#5D4037"
                                    FontSize="12"
                                    Visibility="Collapsed"
-                                   Text="데모: 실제 분석·진단은 실행되지 않습니다. 표·아래 텍스트는 샘플입니다." />
+                                   Text="데모: 실제 분석·진단은 실행되지 않습니다. 표·정리 후보·아래 텍스트는 샘플입니다." />
                         <StackPanel Orientation="Horizontal">
                             <Button x:Name="StartAnalysisButton"
                                     Content="드라이브 상세 분석"
@@ -349,22 +308,22 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <TextBlock Grid.Row="5"
+                    <TextBlock Grid.Row="4"
                                TextWrapping="Wrap"
                                Foreground="#444444"
                                FontSize="12"
                                Margin="0,0,0,8"
-                               Text="드라이브 또는 폴더를 고른 뒤 상세 분석을 시작하세요." />
+                               Text="드라이브를 고른 뒤 상세 분석을 시작하세요." />
 
                     <TextBlock x:Name="AnalysisStateText"
-                               Grid.Row="6"
+                               Grid.Row="5"
                                TextWrapping="Wrap"
                                Foreground="#444444"
                                Margin="0,0,0,6"
                                Text="빠른 개요를 준비하는 중입니다…" />
 
                     <Border x:Name="AnalysisProgressPanel"
-                            Grid.Row="7"
+                            Grid.Row="6"
                             Margin="0,0,0,8"
                             Padding="10,8"
                             Background="#F7F7F7"
@@ -406,7 +365,7 @@
                     </Border>
 
                     <DataGrid x:Name="AnalysisResultsGrid"
-                              Grid.Row="8"
+                              Grid.Row="7"
                               MinHeight="220"
                               MaxHeight="520"
                               VerticalScrollBarVisibility="Auto"
@@ -424,7 +383,7 @@
                               SelectionChanged="AnalysisResultsGrid_OnSelectionChanged" />
 
                     <Border x:Name="AnalysisPerformancePanel"
-                            Grid.Row="9"
+                            Grid.Row="8"
                             Style="{StaticResource PanelCardNeutral}"
                             Margin="0,8,0,10"
                             Visibility="Collapsed">
@@ -455,6 +414,77 @@
                         </StackPanel>
                     </Border>
 
+                    <Border Grid.Row="9"
+                            Margin="0,8,0,10"
+                            Style="{StaticResource PanelCardNeutral}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionTitle}" Margin="0,0,0,4" Text="정리 후보 미리보기" />
+                            <TextBlock Style="{StaticResource SectionHint}"
+                                       Margin="0,0,0,6"
+                                       Text="권장 / 선택 / 위험으로 분류된 정리 후보를 보여줍니다. 현재는 삭제 기능이 없습니다." />
+                            <TextBlock Margin="0,0,0,8"
+                                       TextWrapping="Wrap"
+                                       Foreground="#6D4C41"
+                                       FontSize="11"
+                                       Text="〔미리보기〕정적 샘플 목록입니다. 실제 스캔 결과가 아니며, 체크해도 파일이 삭제되지 않습니다." />
+                            <DataGrid x:Name="CleanupCandidatesGrid"
+                                      MinHeight="160"
+                                      MaxHeight="360"
+                                      VerticalScrollBarVisibility="Auto"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False"
+                                      CanUserDeleteRows="False"
+                                      CanUserReorderColumns="False"
+                                      IsReadOnly="False"
+                                      SelectionMode="Single"
+                                      SelectionUnit="FullRow"
+                                      HeadersVisibility="Column"
+                                      GridLinesVisibility="Horizontal"
+                                      BorderBrush="#D0D0D0"
+                                      BorderThickness="1"
+                                      SelectionChanged="CleanupCandidatesGrid_OnSelectionChanged">
+                                <DataGrid.Columns>
+                                    <DataGridTemplateColumn Header="선택" Width="52" IsReadOnly="False">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox HorizontalAlignment="Center"
+                                                          VerticalAlignment="Center"
+                                                          IsEnabled="{Binding IsSelectable}"
+                                                          IsChecked="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Width="160"
+                                                        Binding="{Binding Name, Mode=OneWay}"
+                                                        Header="이름"
+                                                        IsReadOnly="True" />
+                                    <DataGridTextColumn Width="130"
+                                                        Binding="{Binding RiskBadgeText, Mode=OneWay}"
+                                                        Header="분류"
+                                                        IsReadOnly="True" />
+                                    <DataGridTextColumn Width="120"
+                                                        Binding="{Binding SizeText, Mode=OneWay}"
+                                                        Header="크기"
+                                                        IsReadOnly="True" />
+                                    <DataGridTextColumn Width="220"
+                                                        Binding="{Binding Path, Mode=OneWay}"
+                                                        Header="경로"
+                                                        IsReadOnly="True" />
+                                    <DataGridTextColumn Width="280"
+                                                        Binding="{Binding SummaryForGrid, Mode=OneWay}"
+                                                        Header="설명 요약"
+                                                        IsReadOnly="True" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                            <TextBlock x:Name="CleanupSelectionSummaryText"
+                                       Margin="0,8,0,0"
+                                       FontSize="12"
+                                       Foreground="#333333"
+                                       TextWrapping="Wrap"
+                                       Text="선택 0개 · 합계 크기: —" />
+                        </StackPanel>
+                    </Border>
+
                     <Border Grid.Row="10"
                             Margin="0,8,0,10"
                             Style="{StaticResource PanelCardExperimental}">
@@ -464,17 +494,37 @@
                                        TextWrapping="Wrap"
                                        Foreground="#5E35B1"
                                        FontSize="12"
-                                       Text="NTFS/USN 기반 연구용 도구입니다. 기본 상세 분석을 바꾸거나 대체하지 않습니다." />
+                                       Text="NTFS/USN 기반 진단 기능입니다. 현재는 연구용이며 기본 상세 분석을 대체하지 않습니다." />
                             <TextBlock Margin="0,4,0,0"
                                        TextWrapping="Wrap"
                                        Foreground="#6A1B9A"
                                        FontSize="11"
-                                       Text="로컬에서 읽기 전용으로 실행됩니다. 파일을 수정·삭제하지 않습니다. 범위·한계는 docs/NTFS_FAST_SCAN_RESEARCH.md 를 참고하세요." />
+                                       Text="읽기만 합니다. 자세한 범위는 docs/NTFS_FAST_SCAN_RESEARCH.md 를 참고하세요." />
+
+                            <Border Margin="0,12,0,0"
+                                    Padding="10,8"
+                                    Background="#F3E5F5"
+                                    BorderBrush="#CE93D8"
+                                    BorderThickness="1"
+                                    CornerRadius="4">
+                                <StackPanel>
+                                    <TextBlock FontWeight="SemiBold" Foreground="#4527A0" Text="진단 요약" />
+                                    <TextBlock x:Name="NtfsDiagnosticSummaryText"
+                                               Margin="0,6,0,0"
+                                               TextWrapping="Wrap"
+                                               Foreground="#4A148C"
+                                               FontSize="12"
+                                               Text="아직 실험 진단을 실행하지 않았습니다." />
+                                </StackPanel>
+                            </Border>
+
+                            <TextBlock Margin="0,16,0,4" FontWeight="SemiBold" Foreground="#4527A0" Text="진단 1 · 레코드 열거 속도" />
+                            <TextBlock TextWrapping="Wrap" Foreground="#5E35B1" FontSize="11" Margin="0,0,0,8"
+                                       Text="볼륨에서 USN/MFT 레코드를 얼마나 빠르게 읽을 수 있는지 확인합니다." />
                             <Button x:Name="NtfsFastScanDiagButton"
-                                    Margin="0,12,0,0"
                                     HorizontalAlignment="Left"
                                     Padding="10,6"
-                                    Content="NTFS 진단 실행"
+                                    Content="레코드 열거 진단"
                                     Click="NtfsFastScanDiagButton_OnClick" />
                             <TextBlock x:Name="NtfsFastScanDiagResultText"
                                        Margin="0,10,0,0"
@@ -482,29 +532,26 @@
                                        Foreground="#4527A0"
                                        FontSize="12"
                                        Text="아직 실행하지 않았습니다." />
+
+                            <TextBlock Margin="0,16,0,4" FontWeight="SemiBold" Foreground="#4527A0" Text="진단 2 · 트리 골격" />
+                            <TextBlock TextWrapping="Wrap" Foreground="#5E35B1" FontSize="11" Margin="0,0,0,8"
+                                       Text="FRN / ParentFRN 관계로 파일·폴더 트리 골격을 만들 수 있는지 확인합니다. 폴더별 용량은 여기서 다루지 않습니다." />
                             <Button x:Name="NtfsFastScanTreeDiagButton"
-                                    Margin="0,10,0,0"
                                     HorizontalAlignment="Left"
                                     Padding="10,6"
                                     Content="트리 골격 진단"
                                     Click="NtfsFastScanTreeDiagButton_OnClick" />
-                            <TextBlock Margin="0,4,0,0"
-                                       TextWrapping="Wrap"
-                                       FontSize="11"
-                                       Foreground="#5E35B1"
-                                       Text="폴더별 용량·파일 크기는 계산하지 않습니다." />
                             <TextBlock x:Name="NtfsFastScanTreeDiagResultText"
                                        Margin="0,10,0,0"
                                        TextWrapping="Wrap"
                                        Foreground="#4527A0"
                                        FontSize="12"
                                        Text="아직 실행하지 않았습니다." />
-                            <TextBlock Margin="0,12,0,0"
-                                       TextWrapping="Wrap"
-                                       FontSize="11"
-                                       Foreground="#5E35B1"
-                                       Text="OpenFileById로 일부 파일의 크기 조회 가능성·속도만 샘플합니다. 전 볼륨 집계나 파일 변경은 하지 않습니다." />
-                            <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+
+                            <TextBlock Margin="0,16,0,4" FontWeight="SemiBold" Foreground="#4527A0" Text="진단 3 · 파일 크기 샘플" />
+                            <TextBlock TextWrapping="Wrap" Foreground="#5E35B1" FontSize="11" Margin="0,0,0,8"
+                                       Text="OpenFileById로 일부 파일의 크기를 읽을 수 있는지 확인합니다. 전 볼륨 조회는 하지 않습니다." />
+                            <StackPanel Margin="0,0,0,0" Orientation="Horizontal">
                                 <TextBlock VerticalAlignment="Center" Foreground="#4527A0" Text="샘플 수:" />
                                 <ComboBox x:Name="NtfsFileSizeSampleCountComboBox"
                                           Width="100"
@@ -555,9 +602,32 @@
                                    TextWrapping="Wrap"
                                    Foreground="#555555"
                                    Margin="0,0,0,8"
-                                   Text="읽기 전용으로 드라이브·폴더 사용량을 봅니다. 삭제·정리 실행은 없습니다. 공개 캡처는 데모 모드를 권장합니다." />
+                                   Text="읽기 전용으로 드라이브 사용량을 봅니다. 삭제·정리 실행은 없습니다. 공개 캡처는 데모 모드를 권장합니다." />
 
                         <Separator Margin="0,0,0,8" />
+
+                        <StackPanel x:Name="CleanupCandidateDetailPanel" Visibility="Collapsed" Margin="0,0,0,12">
+                            <TextBlock FontWeight="SemiBold" Foreground="#37474F" Text="정리 후보(미리보기)" />
+                            <TextBlock x:Name="CleanupDetailNameText" Margin="0,6,0,0" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock x:Name="CleanupDetailRiskText" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="#333333" />
+                            <TextBlock x:Name="CleanupDetailPathText" Margin="0,4,0,0" TextWrapping="Wrap" Foreground="#333333" />
+                            <TextBlock x:Name="CleanupDetailDescriptionText" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#333333" />
+                            <TextBlock x:Name="CleanupDetailReasonText" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#444444" />
+                            <TextBlock x:Name="CleanupDetailImpactText" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#444444" />
+                            <TextBlock x:Name="CleanupDetailStatusText"
+                                       Margin="0,10,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="#5D4037"
+                                       FontSize="12"
+                                       Text="현재 상태: 미리보기 / 삭제 기능 없음" />
+                            <TextBlock x:Name="CleanupDetailDangerNoteText"
+                                       Margin="0,6,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="#B71C1C"
+                                       FontSize="12"
+                                       Visibility="Collapsed"
+                                       Text="이 항목은 보호됨 상태이며 선택하거나 삭제할 수 없습니다." />
+                        </StackPanel>
 
                         <StackPanel x:Name="AnalysisEntryDetailPanel" Visibility="Collapsed" Margin="0,0,0,12">
                             <TextBlock x:Name="DetailNameText" FontWeight="SemiBold" TextWrapping="Wrap" />
