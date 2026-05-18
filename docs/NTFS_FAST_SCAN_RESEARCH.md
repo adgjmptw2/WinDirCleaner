@@ -76,3 +76,16 @@ UI는 직전 트리 진단의 `FileRecords`와 샘플의 `FilesPerSecond`로 **�
 
 - 대량 샘플에서도 files/s와 성공률이 안정적이면, **제한된 범위의** 전체 크기 조회를 검토할 수 있습니다.
 - 그렇지 않으면 raw MFT 속성 파싱 등 다른 경로를 조사하거나, NTFS 경로는 구조·속도 진단용으로만 쓸 수 있습니다.
+
+## 정리 후보와의 관계(경로 매핑 PoC)
+
+- 정리 후보의 **표시 경로**(`C:\…`, `%TEMP%` 등)는 USN 레코드의 **이름·FRN**과 바로 같지 않습니다. 후보 폴더를 NTFS 쪽에서 다루려면 **경로 → FRN 체인**을 맞추는 단계가 필요합니다.
+- 앱에는 **`NtfsPathMappingProbeService`**가 있으며, **마지막 경로 세그먼트**가 같은 레코드를 후보로 잡고, **ParentFRN**을 따라 올라가며 위쪽 세그먼트와 일치하는지 확인합니다. 전 레코드에 full path 문자열을 붙이지 않습니다(메모리·속도).
+- 이 진단은 **매핑 가능 여부**만 보고, **크기 합산·OpenFileById 전체 조회·하위 subtree 집계**는 하지 않습니다.
+- 설계 배경은 [NTFS_CLEANUP_CANDIDATE_INTEGRATION.md](NTFS_CLEANUP_CANDIDATE_INTEGRATION.md)를 참고합니다.
+
+### 다음 단계 후보(아직 미구현)
+
+- 매핑된 노드 기준 **하위 subtree**에 해당하는 USN 레코드만 모으기
+- **OpenFileById**로 크기 조회를 **제한된 범위**에서 시험하고, **Directory 기반** 후보 크기와 비교하기
+- raw MFT 속성 파싱 등 다른 전략과의 비교

@@ -82,3 +82,8 @@ WinDirStat은 GPL-2.0입니다. 코드를 가져오거나 포팅하지 않습니
 ### 대안
 
 - raw MFT 쪽으로 연구를 옮기거나, NTFS 경로를 구조 진단 전용으로 제한합니다.
+
+## 정리 후보·NTFS(현재 분리)
+
+- **정리 후보 크기·정리 미리보기**는 `Directory` / `FileInfo` 기반으로만 동작합니다. NTFS 진단 결과는 이 숫자에 **합쳐지지 않습니다**.
+- **경로 매핑 진단**은 “후보 경로가 USN으로 만든 FRN 맵에서 찾아질 수 있는가”만 보는 **실험 단계**입니다. 통합 여부는 [NTFS_CLEANUP_CANDIDATE_INTEGRATION.md](NTFS_CLEANUP_CANDIDATE_INTEGRATION.md)의 기준(매핑 성공률, 속도, 실패 처리, Directory 대비 정확도)을 본 뒤 판단합니다.

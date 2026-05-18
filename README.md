@@ -2,7 +2,7 @@
 
 Windows에서 드라이브 저장소를 **읽기만** 해서 보여 주는 WPF 앱입니다. **실제 파일 삭제·정리 실행·휴지통 처리는 없습니다.**
 
-앱 안에 **데모 모드**가 있어서 실제 디스크 대신 샘플만 띄울 수 있습니다. 일반 상세 분석, **정리 후보 미리보기**, NTFS 실험 진단은 화면에서 구역이 나뉘어 있으며, NTFS 진단이 상세 분석을 대신하지는 않습니다. NTFS가 뭘 하고 안 하는지는 [docs/NTFS_FAST_SCAN_RESEARCH.md](docs/NTFS_FAST_SCAN_RESEARCH.md) 쪽을 보면 됩니다.
+앱 안에 **데모 모드**가 있어서 실제 디스크 대신 샘플만 띄울 수 있습니다. 일반 상세 분석, **정리 후보 미리보기**, NTFS 실험 진단은 화면에서 구역이 나뉘어 있으며, NTFS 진단이 상세 분석을 대신하지는 않습니다. **정리 후보의 크기·정리 미리보기는 `Directory` / `FileInfo` 기반이며, NTFS 진단 결과는 아직 이 숫자에 반영되지 않습니다.** NTFS와 정리 후보를 어떻게 이을지는 [docs/NTFS_CLEANUP_CANDIDATE_INTEGRATION.md](docs/NTFS_CLEANUP_CANDIDATE_INTEGRATION.md)와 실험 패널의 **경로 매핑 진단**(매핑 가능 여부만 확인, 용량 합산 없음)을 참고하면 됩니다. NTFS가 뭘 하고 안 하는지는 [docs/NTFS_FAST_SCAN_RESEARCH.md](docs/NTFS_FAST_SCAN_RESEARCH.md) 쪽을 보면 됩니다.
 
 ## 현재 기능(일반)
 
@@ -72,4 +72,5 @@ dotnet test WinDirCleaner.sln -c Release --no-build
 - [안전 정책](docs/SAFETY_POLICY.md)
 - [성능 메모](docs/PERFORMANCE_AUDIT_WINDIRSTAT.md)
 - [NTFS fast scan 메모](docs/NTFS_FAST_SCAN_RESEARCH.md)
+- [NTFS·정리 후보 통합(설계)](docs/NTFS_CLEANUP_CANDIDATE_INTEGRATION.md)
 - [스크린샷](docs/screenshots/README.md)

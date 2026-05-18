@@ -655,6 +655,22 @@
                                        Foreground="#4527A0"
                                        FontSize="12"
                                        Text="아직 실행하지 않았습니다." />
+
+                            <TextBlock Margin="0,16,0,4" FontWeight="SemiBold" Foreground="#4527A0" Text="진단 4 · 경로 매핑" />
+                            <TextBlock TextWrapping="Wrap" Foreground="#5E35B1" FontSize="11" Margin="0,0,0,8"
+                                       Text="선택한 정리 후보 경로가 NTFS FRN 트리에서 매핑 가능한지 확인합니다. 용량 계산이나 삭제는 수행하지 않습니다." />
+                            <Button x:Name="NtfsPathMappingDiagButton"
+                                    Margin="0,0,0,0"
+                                    HorizontalAlignment="Left"
+                                    Padding="10,6"
+                                    Content="경로 매핑 진단"
+                                    Click="NtfsPathMappingDiagButton_OnClick" />
+                            <TextBlock x:Name="NtfsPathMappingDiagResultText"
+                                       Margin="0,10,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="#4527A0"
+                                       FontSize="12"
+                                       Text="아직 실행하지 않았습니다." />
                         </StackPanel>
                     </Border>
                 </Grid>

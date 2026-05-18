@@ -12,10 +12,12 @@ This file describes direction and scope. It is not a release promise.
 - Stable analysis UX (drive top-level enumeration only)
 - **Demo mode** for safe screenshots (no disk access for candidate refresh; sample cleanup preview only)
 - NTFS diagnostics as **experimental** tools (not a replacement for normal enumeration)
+- **NTFS path mapping probe** for selected cleanup rows (mapping check only; not used for sizes or dry-run)
 
 ## Near-term
 
-- Detection rule refinement (read-only heuristics; still no destructive actions)
+- Keep cleanup preview Directory-based (stable default)
+- Add diagnostics before NTFS integration (path mapping PoC, accuracy notes)
 - Cleanup preview result refinement (wording, caps, overlap handling)
 - Deletion safety design (if ever considered)
 - Confirmation and logging design (if deletion is ever considered)
@@ -26,9 +28,12 @@ This file describes direction and scope. It is not a release promise.
 
 ## Research
 
+- NTFS path mapping for cleanup candidates (USN/FRN vs user-visible paths)
+- Candidate size aggregation strategy (OpenFileById vs MFT vs Directory)
+- Accuracy comparison vs normal directory enumeration and Directory-based cleanup preview
+- Fallback design when NTFS mapping or size reads fail
 - NTFS fast scan size strategy (USN, handles, MFT attributes)
 - Raw MFT attribute parsing feasibility
-- Accuracy comparison vs normal directory enumeration
 - Hard links, reparse points, and special-file edge cases
 
 ## Not planned for now

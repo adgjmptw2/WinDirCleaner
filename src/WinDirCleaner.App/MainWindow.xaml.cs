@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private readonly INtfsFastScanProbeService _ntfsFastScanProbeService = new NtfsFastScanProbeService();
     private readonly INtfsFastScanTreeProbeService _ntfsFastScanTreeProbeService = new NtfsFastScanTreeProbeService();
     private readonly INtfsFileSizeProbeService _ntfsFileSizeProbeService = new NtfsFileSizeProbeService();
+    private readonly INtfsPathMappingProbeService _ntfsPathMappingProbeService = new NtfsPathMappingProbeService();
     private readonly ICleanupCandidateService _cleanupCandidateService = new CleanupCandidatePreviewService();
     private readonly CleanupCandidateDetectionService _cleanupCandidateDetection = new();
     private readonly ICleanupPreviewService _cleanupPreviewService = new CleanupPreviewService();
@@ -348,6 +349,14 @@ public partial class MainWindow : Window
         NtfsFastScanTreeDiagButton.IsEnabled = !demo && !loading && !running && !previewBusy;
         NtfsFileSizeSampleCountComboBox.IsEnabled = !demo && !loading && !running && !previewBusy;
         NtfsFileSizeProbeButton.IsEnabled = !demo && !loading && !running && !previewBusy;
+        var mappingVm = CleanupCandidatesGrid.SelectedItem as CleanupItemViewModel;
+        NtfsPathMappingDiagButton.IsEnabled =
+            !demo
+            && !loading
+            && !running
+            && !previewBusy
+            && mappingVm is { IsDangerous: false }
+            && !string.IsNullOrWhiteSpace(mappingVm.Path);
         CleanupRefreshButton.IsEnabled = !demo && !loading && !running && !_cleanupDetectionRunning && !previewBusy;
         UpdateCleanupPreviewButtonState();
     }
@@ -866,6 +875,7 @@ public partial class MainWindow : Window
         finally
         {
             _syncingDetailSelection = false;
+            ApplyInteractionChromeState();
         }
     }
 
@@ -885,6 +895,7 @@ public partial class MainWindow : Window
         finally
         {
             _syncingDetailSelection = false;
+            ApplyInteractionChromeState();
         }
     }
 
@@ -1371,12 +1382,75 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void NtfsPathMappingDiagButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (_demoMode)
+        {
+            return;
+        }
+
+        if (CleanupCandidatesGrid.SelectedItem is not CleanupItemViewModel vm || vm.IsDangerous)
+        {
+            NtfsPathMappingDiagResultText.Text = "정리 후보 표에서 위험이 아닌 행을 한 줄 선택한 뒤 다시 시도하세요.";
+            return;
+        }
+
+        BeginNtfsUiOperation();
+        NtfsPathMappingDiagButton.IsEnabled = false;
+        NtfsPathMappingDiagResultText.Text = "경로 매핑 진단 중…";
+        try
+        {
+            var result = await _ntfsPathMappingProbeService.ProbePathMappingAsync(vm.Path).ConfigureAwait(true);
+            NtfsPathMappingDiagResultText.Text = FormatNtfsPathMappingProbeResult(result);
+            SetNtfsDiagnosticSummary("경로 매핑 진단 · " + result.Status);
+        }
+        catch (Exception ex)
+        {
+            NtfsPathMappingDiagResultText.Text = "경로 매핑 진단 실패: " + ex.Message;
+            SetNtfsDiagnosticSummary("경로 매핑 진단 · 실패" + Environment.NewLine + ex.Message);
+        }
+        finally
+        {
+            EndNtfsUiOperation();
+        }
+    }
+
+    private static string FormatNtfsPathMappingProbeResult(NtfsPathMappingProbeResult r)
+    {
+        var lines = new List<string>
+        {
+            "Status: " + r.Status,
+            "InputPath: " + r.InputPath,
+            "RootPath: " + r.RootPath,
+            "VolumePath: " + r.VolumePath,
+            "IsNtfs: " + (r.IsNtfs ? "예" : "아니오"),
+            "MatchedName: " + (r.MatchedName ?? "—"),
+            "MatchedFileReferenceNumber: " + (r.MatchedFileReferenceNumber ?? "—"),
+            "RecordsScanned: " + r.RecordsScanned.ToString("N0", CultureInfo.CurrentCulture),
+            "ParsedRecords: " + r.ParsedRecords.ToString("N0", CultureInfo.CurrentCulture),
+            "Elapsed: " + r.Elapsed.TotalMilliseconds.ToString("N0", CultureInfo.CurrentCulture) + " ms",
+        };
+
+        if (!string.IsNullOrEmpty(r.ErrorMessage))
+        {
+            lines.Add("ErrorMessage: " + r.ErrorMessage);
+        }
+
+        if (!string.IsNullOrEmpty(r.DetailMessage))
+        {
+            lines.Add("DetailMessage: " + r.DetailMessage);
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
+
     private void ResetNtfsDiagnosticPlaceholderTexts()
     {
         const string idle = "아직 실행하지 않았습니다.";
         NtfsFastScanDiagResultText.Text = idle;
         NtfsFastScanTreeDiagResultText.Text = idle;
         NtfsFileSizeProbeResultText.Text = idle;
+        NtfsPathMappingDiagResultText.Text = idle;
         SetNtfsDiagnosticSummary("아직 실험 진단을 실행하지 않았습니다.");
     }
 
@@ -1440,6 +1514,8 @@ public partial class MainWindow : Window
             NtfsFastScanDiagResultText.Text = DemoNtfsResultLead + DemoDataService.GetDemoNtfsEnumUsnText();
             NtfsFastScanTreeDiagResultText.Text = DemoNtfsResultLead + DemoDataService.GetDemoNtfsTreeText();
             NtfsFileSizeProbeResultText.Text = DemoNtfsResultLead + DemoDataService.GetDemoNtfsFileSizeText();
+            NtfsPathMappingDiagResultText.Text =
+                DemoNtfsResultLead + "경로 매핑 진단: 데모에서는 실행하지 않습니다. 데모를 끄고 정리 후보 표에서 행을 선택한 뒤 시도하세요.";
             _lastNtfsTreeFileRecords = DemoDataService.GetDemoTreeFileRecordsForEstimate();
             SetNtfsDiagnosticSummary("데모 · 샘플만 표시 · 실제 진단 미실행");
 
