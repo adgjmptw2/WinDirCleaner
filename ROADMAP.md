@@ -7,16 +7,18 @@ This file describes direction and scope. It is not a release promise.
 - Read-only cleanup candidate detection (safe paths only; refresh button)
 - Candidate size estimation for allowed folders (no deletion)
 - **Cleanup candidate preview** (risk labels + protected dangerous rows; no deletion)
-- Keep destructive actions disabled (no dry-run, no cleanup run)
+- **Read-only cleanup preview** (counts + estimated size + sample paths; no deletion)
+- Keep destructive actions disabled (no cleanup run, no delete execution)
 - Stable analysis UX (drive top-level enumeration only)
-- **Demo mode** for safe screenshots (no disk access for candidate refresh; static sample data)
+- **Demo mode** for safe screenshots (no disk access for candidate refresh; sample cleanup preview only)
 - NTFS diagnostics as **experimental** tools (not a replacement for normal enumeration)
 
 ## Near-term
 
 - Detection rule refinement (read-only heuristics; still no destructive actions)
-- Dry-run design (separate UX and safety review)
-- Deletion safety model (if ever considered)
+- Cleanup preview result refinement (wording, caps, overlap handling)
+- Deletion safety design (if ever considered)
+- Confirmation and logging design (if deletion is ever considered)
 - Polish UI layout for preview vs analysis vs NTFS sections
 - Improve NTFS diagnostic reporting (clarity, errors, progress wording)
 - Compare fast-scan diagnostics against normal scan results where useful

@@ -25,8 +25,10 @@ public partial class MainWindow : Window
     private readonly INtfsFileSizeProbeService _ntfsFileSizeProbeService = new NtfsFileSizeProbeService();
     private readonly ICleanupCandidateService _cleanupCandidateService = new CleanupCandidatePreviewService();
     private readonly CleanupCandidateDetectionService _cleanupCandidateDetection = new();
+    private readonly ICleanupPreviewService _cleanupPreviewService = new CleanupPreviewService();
 
     private bool _cleanupDetectionRunning;
+    private bool _cleanupPreviewRunning;
 
     private readonly ObservableCollection<DriveSummaryViewModel> _drives = new();
     private readonly ObservableCollection<StorageAnalysisItemViewModel> _analysisResults = new();
@@ -77,6 +79,8 @@ public partial class MainWindow : Window
         UpdateAnalysisButtonsIdle();
         UpdateNtfsFileSizeBenchmarkHintVisibility();
         UpdateDemoChromeVisuals();
+        ResetCleanupPreviewUi();
+        UpdateCleanupPreviewButtonState();
     }
 
     private async void MainWindow_OnLoaded(object sender, RoutedEventArgs e)
@@ -327,23 +331,25 @@ public partial class MainWindow : Window
         var loading = _driveLoading;
         var ntfsBusy = Volatile.Read(ref _ntfsUiBusyCount) > 0;
         var pendingCap = Volatile.Read(ref _pendingDriveCapacityTasks);
-        var demoToggleOk = !loading && !running && !ntfsBusy && pendingCap == 0;
+        var demoToggleOk = !loading && !running && !ntfsBusy && pendingCap == 0 && !_cleanupPreviewRunning;
         DemoModeCheckBox.IsEnabled = demoToggleOk;
 
         var demo = _demoMode;
-        RefreshDrivesButton.IsEnabled = !demo && !loading && !running;
-        DriveList.IsEnabled = !loading && !running;
+        var previewBusy = _cleanupPreviewRunning;
+        RefreshDrivesButton.IsEnabled = !demo && !loading && !running && !previewBusy;
+        DriveList.IsEnabled = !loading && !running && !previewBusy;
         var sel = DriveList.SelectedItem as DriveSummaryViewModel;
         StartAnalysisButton.IsEnabled =
-            !demo && !loading && !running && sel is { IsDetailedAnalysisEnabled: true };
-        ExperimentalFastDetailCheckBox.IsEnabled = !demo && !loading && !running;
+            !demo && !loading && !running && !previewBusy && sel is { IsDetailedAnalysisEnabled: true };
+        ExperimentalFastDetailCheckBox.IsEnabled = !demo && !loading && !running && !previewBusy;
         ParallelDegreeComboBox.IsEnabled =
-            !demo && !loading && !running && ExperimentalFastDetailCheckBox.IsChecked == true;
-        NtfsFastScanDiagButton.IsEnabled = !demo && !loading && !running;
-        NtfsFastScanTreeDiagButton.IsEnabled = !demo && !loading && !running;
-        NtfsFileSizeSampleCountComboBox.IsEnabled = !demo && !loading && !running;
-        NtfsFileSizeProbeButton.IsEnabled = !demo && !loading && !running;
-        CleanupRefreshButton.IsEnabled = !demo && !loading && !running && !_cleanupDetectionRunning;
+            !demo && !loading && !running && !previewBusy && ExperimentalFastDetailCheckBox.IsChecked == true;
+        NtfsFastScanDiagButton.IsEnabled = !demo && !loading && !running && !previewBusy;
+        NtfsFastScanTreeDiagButton.IsEnabled = !demo && !loading && !running && !previewBusy;
+        NtfsFileSizeSampleCountComboBox.IsEnabled = !demo && !loading && !running && !previewBusy;
+        NtfsFileSizeProbeButton.IsEnabled = !demo && !loading && !running && !previewBusy;
+        CleanupRefreshButton.IsEnabled = !demo && !loading && !running && !_cleanupDetectionRunning && !previewBusy;
+        UpdateCleanupPreviewButtonState();
     }
 
     private void ExperimentalFastDetailCheckBox_OnCheckedChanged(object sender, RoutedEventArgs e) =>
@@ -1672,6 +1678,8 @@ public partial class MainWindow : Window
 
         CleanupCandidatesGrid.SelectedItem = null;
         RefreshCleanupSelectionSummary();
+        ResetCleanupPreviewUi();
+        UpdateCleanupPreviewButtonState();
         UpdateRightPanelPrimary();
     }
 
@@ -1742,6 +1750,7 @@ public partial class MainWindow : Window
         if (count == 0)
         {
             CleanupSelectionSummaryText.Text = "선택 0개 · 합계 크기: —";
+            UpdateCleanupPreviewButtonState();
             return;
         }
 
@@ -1749,6 +1758,7 @@ public partial class MainWindow : Window
         {
             CleanupSelectionSummaryText.Text =
                 string.Create(CultureInfo.CurrentCulture, $"선택 {count:N0}개 · 합계 크기: 미계산 항목만 포함 {scopeTag}");
+            UpdateCleanupPreviewButtonState();
             return;
         }
 
@@ -1758,11 +1768,44 @@ public partial class MainWindow : Window
                 string.Create(
                     CultureInfo.CurrentCulture,
                     $"선택 {count:N0}개 · 합계(크기가 있는 항목만): {ByteSizeFormatter.Format(sum)} · 나머지는 미계산 {scopeTag}");
+            UpdateCleanupPreviewButtonState();
             return;
         }
 
         CleanupSelectionSummaryText.Text =
             string.Create(CultureInfo.CurrentCulture, $"선택 {count:N0}개 · 합계 크기: {ByteSizeFormatter.Format(sum)} {scopeTag}");
+        UpdateCleanupPreviewButtonState();
+    }
+
+    private void UpdateCleanupPreviewButtonState()
+    {
+        if (CleanupPreviewButton is null)
+        {
+            return;
+        }
+
+        var loading = _driveLoading;
+        var running = _analysisRunning;
+        var ntfsBusy = Volatile.Read(ref _ntfsUiBusyCount) > 0;
+        if (_cleanupPreviewRunning)
+        {
+            CleanupPreviewButton.IsEnabled = false;
+            return;
+        }
+
+        if (loading || running || ntfsBusy || _cleanupDetectionRunning)
+        {
+            CleanupPreviewButton.IsEnabled = false;
+            return;
+        }
+
+        var eligible = _cleanupCandidates.Any(x =>
+            x.IsSelected
+            && x.Risk != CleanupRisk.Dangerous
+            && x.IsSelectable
+            && x.CanDelete);
+
+        CleanupPreviewButton.IsEnabled = eligible;
     }
 
     private void UpdateRightPanelPrimary()
@@ -1821,5 +1864,105 @@ public partial class MainWindow : Window
         DetailCountsText.Text = $"파일 수: {vm.FileCountText}, 폴더 수: {vm.DirectoryCountText}, 접근 가능: {(vm.IsAccessible ? "예" : "아니오")}";
         DetailAnalysisPerfText.Text = vm.ItemAnalysisTimingText;
         DetailNoteText.Text = "비고: " + vm.NoteText;
+    }
+
+    private void ResetCleanupPreviewUi()
+    {
+        CleanupPreviewStatusText.Text = "—";
+        CleanupPreviewSummaryText.Text = "아직 정리 미리보기를 실행하지 않았습니다.";
+        CleanupPreviewMessagesText.Text = string.Empty;
+        CleanupPreviewSampleText.Text = string.Empty;
+    }
+
+    private void ApplyCleanupPreviewResultToUi(CleanupPreviewResult result)
+    {
+        var s = result.Summary;
+        var elapsedMs = (long)Math.Round(s.Elapsed.TotalMilliseconds);
+        var fps = s.FilesPerSecond;
+
+        CleanupPreviewSummaryText.Text = string.Join(
+            Environment.NewLine,
+            $"선택 후보 수: {s.SelectedCandidateCount:N0}",
+            $"스캔한 후보 루트: {s.ScannedCandidateCount:N0}",
+            $"제외·건너뜀(선택 기준): {s.SkippedCandidateCount:N0}",
+            $"대상 파일 수: {s.TargetFileCount:N0}",
+            $"대상 폴더 수(탐색한 디렉터리): {s.TargetDirectoryCount:N0}",
+            $"접근 제한으로 건너뜀: {s.InaccessibleCount:N0}",
+            $"기타 실패·건너뜀: {s.FailedCount:N0}",
+            $"예상 크기 합계: {ByteSizeFormatter.Format(s.EstimatedBytes)}",
+            $"소요 시간: {elapsedMs:N0} ms",
+            $"대상 파일 처리 속도: {fps:F1} files/s");
+
+        CleanupPreviewMessagesText.Text =
+            result.Messages.Count > 0 ? string.Join(Environment.NewLine, result.Messages) : string.Empty;
+
+        var lines = new List<string>();
+        foreach (var t in result.SampleTargets.Take(20))
+        {
+            lines.Add($"{t.SourceCandidateName} · {t.Name} ({ByteSizeFormatter.Format(t.SizeBytes)})");
+            lines.Add("  " + t.Path);
+        }
+
+        CleanupPreviewSampleText.Text = string.Join(Environment.NewLine, lines);
+    }
+
+    private List<CleanupItem> SnapshotCleanupItemsForPreview() =>
+        _cleanupCandidates
+            .Select(
+                vm => new CleanupItem(
+                    vm.Item.Id,
+                    vm.Item.Name,
+                    vm.Item.Path,
+                    vm.Item.SizeBytes,
+                    vm.Item.Risk,
+                    vm.IsSelected,
+                    vm.Item.Description,
+                    vm.Item.Reason,
+                    vm.Item.Impact))
+            .ToList();
+
+    private async void CleanupPreviewButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (_cleanupPreviewRunning)
+        {
+            return;
+        }
+
+        _cleanupPreviewRunning = true;
+        ApplyInteractionChromeState();
+        UpdateCleanupPreviewButtonState();
+
+        try
+        {
+            if (_demoMode)
+            {
+                CleanupPreviewStatusText.Text = "데모 모드: 샘플 미리보기 결과를 표시합니다.";
+                ApplyCleanupPreviewResultToUi(DemoDataService.GetDemoCleanupPreviewResult());
+                return;
+            }
+
+            CleanupPreviewStatusText.Text = "정리 미리보기 계산 중…";
+            var snapshot = SnapshotCleanupItemsForPreview();
+            var result = await _cleanupPreviewService.PreviewAsync(snapshot, CancellationToken.None).ConfigureAwait(true);
+            ApplyCleanupPreviewResultToUi(result);
+            CleanupPreviewStatusText.Text = "정리 미리보기 완료";
+        }
+        catch (OperationCanceledException)
+        {
+            CleanupPreviewStatusText.Text = "정리 미리보기가 취소되었습니다.";
+        }
+        catch (Exception ex)
+        {
+            CleanupPreviewStatusText.Text = "정리 미리보기 실패: " + ex.Message;
+            CleanupPreviewSummaryText.Text = "미리보기를 완료하지 못했습니다.";
+            CleanupPreviewMessagesText.Text = string.Empty;
+            CleanupPreviewSampleText.Text = string.Empty;
+        }
+        finally
+        {
+            _cleanupPreviewRunning = false;
+            ApplyInteractionChromeState();
+            UpdateCleanupPreviewButtonState();
+        }
     }
 }

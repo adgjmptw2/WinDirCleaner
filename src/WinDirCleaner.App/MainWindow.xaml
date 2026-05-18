@@ -245,6 +245,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0" Style="{StaticResource SectionTitle}" Text="상세 분석 (일반)" />
@@ -433,11 +434,21 @@
                                        Foreground="#444444"
                                        FontSize="11"
                                        Text="일부 안전 후보의 크기를 읽기 전용으로 확인합니다. 파일을 수정하거나 삭제하지 않습니다." />
+                            <TextBlock Margin="0,0,0,6"
+                                       TextWrapping="Wrap"
+                                       Foreground="#444444"
+                                       FontSize="11"
+                                       Text="선택한 후보를 기준으로 대상 파일 수와 예상 크기만 계산합니다. 파일을 삭제하지 않습니다." />
                             <StackPanel Margin="0,0,0,8" Orientation="Horizontal">
                                 <Button x:Name="CleanupRefreshButton"
                                         Padding="10,6"
                                         Content="정리 후보 새로고침"
                                         Click="CleanupRefreshButton_OnClick" />
+                                <Button x:Name="CleanupPreviewButton"
+                                        Margin="8,0,0,0"
+                                        Padding="10,6"
+                                        Content="정리 미리보기"
+                                        Click="CleanupPreviewButton_OnClick" />
                             </StackPanel>
                             <TextBlock x:Name="CleanupDetectionStatusText"
                                        Margin="0,0,0,8"
@@ -504,6 +515,47 @@
                     </Border>
 
                     <Border Grid.Row="10"
+                            Margin="0,0,0,10"
+                            Style="{StaticResource PanelCardInfo}">
+                        <StackPanel>
+                            <TextBlock Style="{StaticResource SectionTitle}" Margin="0,0,0,4" Text="정리 미리보기 결과" />
+                            <TextBlock x:Name="CleanupPreviewStatusText"
+                                       Margin="0,0,0,6"
+                                       TextWrapping="Wrap"
+                                       Foreground="#333333"
+                                       FontSize="12"
+                                       Text="—" />
+                            <TextBlock x:Name="CleanupPreviewSummaryText"
+                                       Margin="0,0,0,6"
+                                       TextWrapping="Wrap"
+                                       Foreground="#222222"
+                                       FontSize="12"
+                                       Text="아직 정리 미리보기를 실행하지 않았습니다." />
+                            <TextBlock x:Name="CleanupPreviewMessagesText"
+                                       Margin="0,0,0,6"
+                                       TextWrapping="Wrap"
+                                       Foreground="#37474F"
+                                       FontSize="11"
+                                       Text="" />
+                            <TextBlock Margin="0,0,0,4"
+                                       FontWeight="SemiBold"
+                                       Foreground="#1565C0"
+                                       Text="샘플 대상(일부)" />
+                            <TextBlock x:Name="CleanupPreviewSampleText"
+                                       TextWrapping="Wrap"
+                                       Foreground="#333333"
+                                       FontSize="11"
+                                       Text="" />
+                            <TextBlock x:Name="CleanupPreviewDisclaimerText"
+                                       Margin="0,10,0,0"
+                                       TextWrapping="Wrap"
+                                       Foreground="#5D4037"
+                                       FontSize="11"
+                                       Text="이 결과는 읽기 전용 미리보기입니다. 파일은 삭제되지 않았습니다." />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Grid.Row="11"
                             Margin="0,8,0,10"
                             Style="{StaticResource PanelCardExperimental}">
                         <StackPanel>

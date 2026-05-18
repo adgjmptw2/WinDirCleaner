@@ -137,6 +137,57 @@ internal static class DemoDataService
 
     internal static long GetDemoTreeFileRecordsForEstimate() => 820_000L;
 
+    internal static CleanupPreviewResult GetDemoCleanupPreviewResult()
+    {
+        const long approx14GiB = 1409286144L;
+        var summary = new CleanupPreviewSummary(
+            selectedCandidateCount: 2,
+            scannedCandidateCount: 2,
+            skippedCandidateCount: 0,
+            targetFileCount: 128,
+            targetDirectoryCount: 12,
+            inaccessibleCount: 0,
+            failedCount: 0,
+            estimatedBytes: approx14GiB,
+            elapsed: TimeSpan.FromMilliseconds(280));
+
+        IReadOnlyList<CleanupPreviewTarget> samples =
+            new[]
+            {
+                new CleanupPreviewTarget(
+                    "sample-cache.bin",
+                    @"C:\Demo\Temp\sample-cache.bin",
+                    786_432L,
+                    isDirectory: false,
+                    sourceCandidateId: "demo-temp",
+                    sourceCandidateName: "[데모] 사용자 임시",
+                    note: null),
+                new CleanupPreviewTarget(
+                    "download.tmp",
+                    @"C:\Demo\Updates\download.tmp",
+                    1_572_864L,
+                    isDirectory: false,
+                    sourceCandidateId: "demo-wu",
+                    sourceCandidateName: "[데모] 업데이트 캐시",
+                    note: null),
+                new CleanupPreviewTarget(
+                    "sample.dmp",
+                    @"C:\Demo\CrashDumps\sample.dmp",
+                    3_145_728L,
+                    isDirectory: false,
+                    sourceCandidateId: "demo-dmp",
+                    sourceCandidateName: "[데모] 덤프",
+                    note: null),
+            };
+
+        var messages = new[]
+        {
+            "〔데모〕실제 폴더를 읽지 않은 고정 표시입니다.",
+        };
+
+        return new CleanupPreviewResult(summary, samples, messages);
+    }
+
     internal static IReadOnlyList<CleanupItem> GetDemoCleanupPreviewItems()
     {
         var preview = new CleanupCandidatePreviewService().GetPreviewCandidates();
