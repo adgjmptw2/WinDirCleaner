@@ -24,6 +24,9 @@ public partial class MainWindow : Window
     private readonly INtfsFastScanTreeProbeService _ntfsFastScanTreeProbeService = new NtfsFastScanTreeProbeService();
     private readonly INtfsFileSizeProbeService _ntfsFileSizeProbeService = new NtfsFileSizeProbeService();
     private readonly ICleanupCandidateService _cleanupCandidateService = new CleanupCandidatePreviewService();
+    private readonly CleanupCandidateDetectionService _cleanupCandidateDetection = new();
+
+    private bool _cleanupDetectionRunning;
 
     private readonly ObservableCollection<DriveSummaryViewModel> _drives = new();
     private readonly ObservableCollection<StorageAnalysisItemViewModel> _analysisResults = new();
@@ -66,7 +69,7 @@ public partial class MainWindow : Window
         AnalysisResultsGrid.ItemsSource = _analysisResults;
         CleanupCandidatesGrid.ItemsSource = _cleanupCandidates;
         ConfigureAnalysisColumns();
-        RefillCleanupCandidatesFromService(useDemo: false);
+        RefillCleanupCandidatesPreview(useDemo: false);
         ParallelDegreeComboBox.Items.Add(2);
         ParallelDegreeComboBox.Items.Add(3);
         ParallelDegreeComboBox.Items.Add(4);
@@ -221,7 +224,7 @@ public partial class MainWindow : Window
             ApplyInteractionChromeState();
             if (!_demoMode)
             {
-                RefillCleanupCandidatesFromService(useDemo: false);
+                RefillCleanupCandidatesPreview(useDemo: false);
             }
         }
 
@@ -340,6 +343,7 @@ public partial class MainWindow : Window
         NtfsFastScanTreeDiagButton.IsEnabled = !demo && !loading && !running;
         NtfsFileSizeSampleCountComboBox.IsEnabled = !demo && !loading && !running;
         NtfsFileSizeProbeButton.IsEnabled = !demo && !loading && !running;
+        CleanupRefreshButton.IsEnabled = !demo && !loading && !running && !_cleanupDetectionRunning;
     }
 
     private void ExperimentalFastDetailCheckBox_OnCheckedChanged(object sender, RoutedEventArgs e) =>
@@ -1421,7 +1425,7 @@ public partial class MainWindow : Window
             _analysisResults.Clear();
             RefillDemoAnalysisResults();
             AnalysisResultsGrid.SelectedItem = null;
-            RefillCleanupCandidatesFromService(useDemo: true);
+            RefillCleanupCandidatesPreview(useDemo: true);
             CleanupCandidatesGrid.SelectedItem = null;
             UpdateRightPanelPrimary();
 
@@ -1650,7 +1654,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void RefillCleanupCandidatesFromService(bool useDemo)
+    private void ReplaceCleanupVms(IReadOnlyList<CleanupItem> items, bool isStaticPreview)
     {
         foreach (var vm in _cleanupCandidates)
         {
@@ -1659,15 +1663,59 @@ public partial class MainWindow : Window
 
         _cleanupCandidates.Clear();
 
-        var items = useDemo ? DemoDataService.GetDemoCleanupPreviewItems() : _cleanupCandidateService.GetPreviewCandidates();
         foreach (var item in items)
         {
-            var vm = new CleanupItemViewModel(item);
+            var vm = new CleanupItemViewModel(item, isStaticPreview);
             vm.SelectionChanged += CleanupItemViewModel_OnSelectionChanged;
             _cleanupCandidates.Add(vm);
         }
 
+        CleanupCandidatesGrid.SelectedItem = null;
         RefreshCleanupSelectionSummary();
+        UpdateRightPanelPrimary();
+    }
+
+    private void RefillCleanupCandidatesPreview(bool useDemo)
+    {
+        var items = useDemo ? DemoDataService.GetDemoCleanupPreviewItems() : _cleanupCandidateService.GetPreviewCandidates();
+        ReplaceCleanupVms(items, isStaticPreview: true);
+        CleanupDetectionStatusText.Text = useDemo
+            ? "데모 모드에서는 샘플 후보만 표시합니다."
+            : "정적 미리보기를 표시 중입니다. 「정리 후보 새로고침」으로 일부 경로 크기를 읽기 전용으로 확인할 수 있습니다.";
+    }
+
+    private async void CleanupRefreshButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (_demoMode)
+        {
+            CleanupDetectionStatusText.Text = "데모 모드에서는 샘플 후보만 표시합니다.";
+            return;
+        }
+
+        _cleanupDetectionRunning = true;
+        CleanupRefreshButton.IsEnabled = false;
+        CleanupDetectionStatusText.Text = "정리 후보 확인 중…";
+        ApplyInteractionChromeState();
+        try
+        {
+            using var cts = new CancellationTokenSource();
+            var items = await _cleanupCandidateDetection.DetectCandidatesAsync(cts.Token).ConfigureAwait(true);
+            ReplaceCleanupVms(items, isStaticPreview: false);
+            CleanupDetectionStatusText.Text = "정리 후보 확인 완료";
+        }
+        catch (OperationCanceledException)
+        {
+            CleanupDetectionStatusText.Text = "정리 후보 확인이 취소되었습니다.";
+        }
+        catch (Exception ex)
+        {
+            CleanupDetectionStatusText.Text = "정리 후보 확인 중 오류: " + ex.Message;
+        }
+        finally
+        {
+            _cleanupDetectionRunning = false;
+            ApplyInteractionChromeState();
+        }
     }
 
     private void CleanupItemViewModel_OnSelectionChanged(object? sender, EventArgs e) => RefreshCleanupSelectionSummary();
@@ -1687,6 +1735,10 @@ public partial class MainWindow : Window
             }
         }
 
+        var scopeTag = _cleanupCandidates.Any(x => !x.IsStaticPreview)
+            ? "(읽기 전용 확인)"
+            : "(미리보기)";
+
         if (count == 0)
         {
             CleanupSelectionSummaryText.Text = "선택 0개 · 합계 크기: —";
@@ -1696,7 +1748,7 @@ public partial class MainWindow : Window
         if (counted == 0)
         {
             CleanupSelectionSummaryText.Text =
-                string.Create(CultureInfo.CurrentCulture, $"선택 {count:N0}개 · 합계 크기: 미계산 항목만 포함(미리보기)");
+                string.Create(CultureInfo.CurrentCulture, $"선택 {count:N0}개 · 합계 크기: 미계산 항목만 포함 {scopeTag}");
             return;
         }
 
@@ -1705,12 +1757,12 @@ public partial class MainWindow : Window
             CleanupSelectionSummaryText.Text =
                 string.Create(
                     CultureInfo.CurrentCulture,
-                    $"선택 {count:N0}개 · 합계(크기가 있는 항목만): {ByteSizeFormatter.Format(sum)} · 나머지는 미계산(미리보기)");
+                    $"선택 {count:N0}개 · 합계(크기가 있는 항목만): {ByteSizeFormatter.Format(sum)} · 나머지는 미계산 {scopeTag}");
             return;
         }
 
         CleanupSelectionSummaryText.Text =
-            string.Create(CultureInfo.CurrentCulture, $"선택 {count:N0}개 · 합계 크기: {ByteSizeFormatter.Format(sum)} (미리보기)");
+            string.Create(CultureInfo.CurrentCulture, $"선택 {count:N0}개 · 합계 크기: {ByteSizeFormatter.Format(sum)} {scopeTag}");
     }
 
     private void UpdateRightPanelPrimary()

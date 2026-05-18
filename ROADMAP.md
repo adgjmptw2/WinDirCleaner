@@ -4,17 +4,19 @@ This file describes direction and scope. It is not a release promise.
 
 ## Current focus
 
-- Read-only storage overview
+- Read-only cleanup candidate detection (safe paths only; refresh button)
+- Candidate size estimation for allowed folders (no deletion)
 - **Cleanup candidate preview** (risk labels + protected dangerous rows; no deletion)
+- Keep destructive actions disabled (no dry-run, no cleanup run)
 - Stable analysis UX (drive top-level enumeration only)
-- **Demo mode** for safe screenshots (no disk access, static sample data)
+- **Demo mode** for safe screenshots (no disk access for candidate refresh; static sample data)
 - NTFS diagnostics as **experimental** tools (not a replacement for normal enumeration)
 
 ## Near-term
 
-- Candidate detection rules (read-only heuristics; still no destructive actions)
+- Detection rule refinement (read-only heuristics; still no destructive actions)
 - Dry-run design (separate UX and safety review)
-- Deletion safety review (if ever considered)
+- Deletion safety model (if ever considered)
 - Polish UI layout for preview vs analysis vs NTFS sections
 - Improve NTFS diagnostic reporting (clarity, errors, progress wording)
 - Compare fast-scan diagnostics against normal scan results where useful
@@ -22,9 +24,9 @@ This file describes direction and scope. It is not a release promise.
 
 ## Research
 
-- NTFS file-size strategy (USN, handles, MFT attributes)
+- NTFS fast scan size strategy (USN, handles, MFT attributes)
 - Raw MFT attribute parsing feasibility
-- Accuracy vs normal directory enumeration
+- Accuracy comparison vs normal directory enumeration
 - Hard links, reparse points, and special-file edge cases
 
 ## Not planned for now

@@ -57,4 +57,12 @@ public class CleanupCandidatePreviewServiceTests
             Assert.False(string.IsNullOrWhiteSpace(x.Impact));
         }
     }
+
+    [Fact]
+    public async Task DetectCandidatesAsync_ReturnsSameCountAsGetPreview()
+    {
+        var preview = _sut.GetPreviewCandidates();
+        var detect = await _sut.DetectCandidatesAsync();
+        Assert.Equal(preview.Count, detect.Count);
+    }
 }

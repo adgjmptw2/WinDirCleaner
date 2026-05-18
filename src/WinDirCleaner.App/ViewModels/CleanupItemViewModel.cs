@@ -10,9 +10,10 @@ public sealed class CleanupItemViewModel : INotifyPropertyChanged
 {
     private bool _isSelected;
 
-    public CleanupItemViewModel(CleanupItem item)
+    public CleanupItemViewModel(CleanupItem item, bool isStaticPreview = false)
     {
         Item = item;
+        IsStaticPreview = isStaticPreview;
         _isSelected = item.Selectable && item.Selected;
         if (!item.Selectable)
         {
@@ -21,6 +22,9 @@ public sealed class CleanupItemViewModel : INotifyPropertyChanged
     }
 
     public CleanupItem Item { get; }
+
+    /// <summary>정적 프리뷰/데모에서 온 행이면 true. 실제 읽기 전용 탐지 후면 false.</summary>
+    public bool IsStaticPreview { get; }
 
     public string Id => Item.Id;
 
@@ -42,10 +46,28 @@ public sealed class CleanupItemViewModel : INotifyPropertyChanged
 
     public string Impact => Item.Impact;
 
-    public string SizeText =>
-        Item.SizeBytes > 0
-            ? ByteSizeFormatter.Format(Item.SizeBytes)
-            : "미리보기(미계산)";
+    public string SizeText
+    {
+        get
+        {
+            if (Item.Risk == CleanupRisk.Dangerous)
+            {
+                return "보호됨";
+            }
+
+            if (Item.SizeBytes > 0)
+            {
+                return ByteSizeFormatter.Format(Item.SizeBytes);
+            }
+
+            if (IsStaticPreview)
+            {
+                return "미리보기(미계산)";
+            }
+
+            return "없음 또는 0 B";
+        }
+    }
 
     public string RiskText => Item.Risk switch
     {

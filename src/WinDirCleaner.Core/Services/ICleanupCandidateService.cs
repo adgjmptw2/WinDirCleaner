@@ -8,4 +8,9 @@ namespace WinDirCleaner.Core.Services;
 public interface ICleanupCandidateService
 {
     IReadOnlyList<CleanupItem> GetPreviewCandidates();
+
+    /// <summary>
+    /// 프리뷰 서비스는 정적 목록을 그대로 반환합니다. 실제 탐지는 <see cref="CleanupCandidateDetectionService"/>를 사용하세요.
+    /// </summary>
+    Task<IReadOnlyList<CleanupItem>> DetectCandidatesAsync(CancellationToken cancellationToken = default);
 }

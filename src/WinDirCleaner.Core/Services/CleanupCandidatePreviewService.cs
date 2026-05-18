@@ -81,4 +81,10 @@ public sealed class CleanupCandidatePreviewService : ICleanupCandidateService
                 reason: "직접 삭제하면 프로그램이 손상되거나 제거될 수 있습니다.",
                 impact: "이 앱에서는 삭제하거나 선택할 수 없도록 막아 두었습니다."),
         };
+
+    public Task<IReadOnlyList<CleanupItem>> DetectCandidatesAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(GetPreviewCandidates());
+    }
 }
